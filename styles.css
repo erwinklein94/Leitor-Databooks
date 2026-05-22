@@ -160,18 +160,46 @@ html[data-theme="light"] .proj-pill{background:var(--navy-2);color:#fff}
 
 
 /* ---------- Hero ---------- */
+.hub-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  min-height:42px;
+  padding:10px 20px;
+  border-radius:16px;
+  background:#003b70;
+  color:#ffffff;
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 8px 18px rgba(0,22,45,.16);
+  text-decoration:none;
+  font-weight:900;
+  font-size:1rem;
+  letter-spacing:-.01em;
+  transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.hub-back:hover{
+  transform:translateY(-1px);
+  background:#0a4f88;
+  box-shadow:0 12px 22px rgba(0,22,45,.18);
+}
+.hub-back:focus-visible{
+  outline:3px solid rgba(255,221,0,.76);
+  outline-offset:3px;
+}
+
 .hero-topline{
   display:flex;
   align-items:center;
+  justify-content:flex-start;
   gap:12px;
-  margin:0 0 8px;
+  margin:0 0 14px;
 }
 .hero{
   display:grid;
   gap:10px;
   position:relative;
   overflow:hidden;
-  
   border:1px solid rgba(0,59,112,.14);
   border-radius:30px;
   background:linear-gradient(115deg,rgba(255,255,255,.99) 0%,rgba(255,255,255,.99) 66%,rgba(244,249,253,.98) 84%,rgba(223,248,215,.96) 100%);
@@ -453,6 +481,6 @@ html[data-theme="light"] table.cmp th{background:#f4f8fb}html[data-theme="light"
 @media(max-width:700px){
   .topbar-inner,.wrap{width:min(100% - 18px,1440px)}
   .topbar-inner{align-items:flex-start}.brand-txt b{font-size:.9rem;white-space:normal}.header-actions{width:100%;justify-content:flex-start}.topbar-spacer{display:none}
-  .hero{padding:20px 18px 24px;border-radius:24px}.hero-topline{margin-bottom:10px}.hub-back{min-height:42px;padding:10px 16px;font-size:.95rem}h1.title{font-size:clamp(2rem,12vw,3.35rem)}.subtitle{font-size:.95rem}
+  .hero{padding:20px 18px 24px;border-radius:24px}.hero-topline{margin-bottom:12px}.hub-back{min-height:40px;padding:10px 18px;border-radius:15px;font-size:.96rem}h1.title{font-size:clamp(2rem,12vw,3.35rem)}.subtitle{font-size:.95rem}
   .kpis{grid-template-columns:1fr}.section-b,.setup-body{padding:18px}.setup-foot,.setup-head,.section-h{padding-left:18px;padding-right:18px}.cmp-head{padding:14px 16px}.cmp .res{text-align:left}.tabs{border-radius:16px}
 }
