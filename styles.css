@@ -119,61 +119,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
   align-items:center;
   gap:14px;
 }
-.brand{display:flex;align-items:center;gap:16px;min-width:0}
-.brand-mark{
-  width:136px;
-  min-width:136px;
-  height:58px;
-  display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  padding:0 18px;
-  overflow:visible;
-  border-radius:18px;
-  background:#fff;
-  border:1px solid rgba(255,255,255,.72);
-  box-shadow:0 16px 36px rgba(0,0,0,.18);
-  color:var(--navy-2);
-}
-.rumo-wordmark{
-  position:relative;
-  display:inline-flex;
-  align-items:flex-end;
-  color:var(--navy-2);
-  font-weight:950;
-  font-size:2.2rem;
-  line-height:.9;
-  letter-spacing:-.08em;
-}
-.rumo-text{display:inline-block}
-.rumo-o{
-  position:relative;
-  display:inline-block;
-  width:.72em;
-  height:.82em;
-  margin-left:-.02em;
-}
-.rumo-o::before{
-  content:"o";
-  position:absolute;
-  inset:0;
-  display:block;
-}
-.rumo-o::after{
-  content:"";
-  position:absolute;
-  width:.54em;
-  height:.54em;
-  right:-.07em;
-  top:.2em;
-  border:.14em solid var(--navy-2);
-  border-left-color:transparent;
-  border-top-color:transparent;
-  border-radius:50%;
-  transform:rotate(-32deg);
-}
-.brand-fallback{display:none}
-
+.brand{display:flex;align-items:center;gap:0;min-width:0}
 .brand-txt{min-width:0}
 .brand-txt b{
   display:block;
@@ -506,7 +452,7 @@ html[data-theme="light"] table.cmp th{background:#f4f8fb}html[data-theme="light"
 }
 @media(max-width:700px){
   .topbar-inner,.wrap{width:min(100% - 18px,1440px)}
-  .topbar-inner{align-items:flex-start}.brand-mark{width:110px;min-width:110px;height:54px;padding:0 14px}.rumo-wordmark{font-size:1.82rem}.brand-txt b{font-size:.9rem;white-space:normal}.header-actions{width:100%;justify-content:flex-start}.topbar-spacer{display:none}
+  .topbar-inner{align-items:flex-start}.brand-txt b{font-size:.9rem;white-space:normal}.header-actions{width:100%;justify-content:flex-start}.topbar-spacer{display:none}
   .hero{padding:20px 18px 24px;border-radius:24px}.hero-topline{margin-bottom:10px}.hub-back{min-height:42px;padding:10px 16px;font-size:.95rem}h1.title{font-size:clamp(2rem,12vw,3.35rem)}.subtitle{font-size:.95rem}
   .kpis{grid-template-columns:1fr}.section-b,.setup-body{padding:18px}.setup-foot,.setup-head,.section-h{padding-left:18px;padding-right:18px}.cmp-head{padding:14px 16px}.cmp .res{text-align:left}.tabs{border-radius:16px}
 }
