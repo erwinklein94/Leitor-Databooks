@@ -5,9 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="description" content="Cruzamento automático entre o databook de produção da Cavan e a planilha de controle de qualidade da Rumo." />
 <title>Cruzamento Databook x Planilha — DM de Concreto</title>
+<script>
+(function(){
+  try{
+    if(localStorage.getItem("hq-theme") === "light"){
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }catch(error){}
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css" />
@@ -16,14 +25,19 @@
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <div class="brand-mark">R</div>
+      <div class="brand-mark" aria-label="Rumo">
+        <img src="https://logospng.org/download/rumo-logistica/logo-rumo-logistica-1024.png" alt="Rumo Logística" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" /><span class="brand-fallback">RUMO</span>
+      </div>
       <div class="brand-txt">
         <b>Controle de Qualidade — DM de Concreto</b>
         <span>Cruzamento Databook Cavan × Planilha Rumo</span>
       </div>
     </div>
     <div class="topbar-spacer"></div>
-    <span class="proj-pill" id="projPill" style="display:none"><span class="dot"></span><span id="projPillTxt">—</span></span>
+    <div class="header-actions">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema"><span class="sun"></span><span id="themeLabel">Tema claro</span></button>
+      <span class="proj-pill" id="projPill" style="display:none"><span class="dot"></span><span id="projPillTxt">—</span></span>
+    </div>
   </div>
 </div>
 
@@ -102,5 +116,29 @@ window.PROJECT_LABELS = {
 };
 </script>
 <script src="app.js"></script>
+<script>
+(function(){
+  const btn = document.getElementById("themeToggle");
+  const label = document.getElementById("themeLabel");
+  if(!btn || !label) return;
+  const sync = () => {
+    const isLight = document.documentElement.getAttribute("data-theme") === "light";
+    label.textContent = isLight ? "Tema escuro" : "Tema claro";
+    btn.setAttribute("aria-pressed", String(isLight));
+  };
+  btn.addEventListener("click", () => {
+    const isLight = document.documentElement.getAttribute("data-theme") === "light";
+    if(isLight){
+      document.documentElement.removeAttribute("data-theme");
+      try{ localStorage.removeItem("hq-theme"); }catch(error){}
+    }else{
+      document.documentElement.setAttribute("data-theme", "light");
+      try{ localStorage.setItem("hq-theme", "light"); }catch(error){}
+    }
+    sync();
+  });
+  sync();
+})();
+</script>
 </body>
 </html>
