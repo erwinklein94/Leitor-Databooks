@@ -82,15 +82,21 @@ function parseCertPage(items, pageNum){
   const tipo = (allText.match(/TIPO DE DORMENTE:\s*([^\n]+?)(?:\s+LOTE:|$)/i)||[])[1] || null;
   const data = (allText.match(/DATA DE PRODU[ÇC][ÃA]O:\s*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i)||[])[1] || null;
 
-  // ----- Compressão axial e tração: linhas "0,6|7|14|28 dias ..." -----
+  // ----- Compressão axial e tração -----
+  // O 1º dia de cura é uma fração (0,5 / 0,6 / 0,7 / 0,8 ... varia por lote/projeto)
+  // e corresponde à desprotensão. Os demais são 7, 14 e 28 dias.
   const comp = {}, trac = {};
+  let primeiroDia = null; // ex.: "0,5" — guarda qual fração o lote usou
   for (const ln of lines){
-    const m = ln.match(/^\s*(0,6|0\.6|7|14|28)\s*dias\s+(.*)$/i);
+    const m = ln.match(/^\s*(0[.,]\d|7|14|28)\s*dias\s+(.*)$/i);
     if (m){
-      let dia = m[1].replace(".",",");
+      const dia = m[1].replace(".",",");
+      const isFrac = /^0,/.test(dia);
+      const key = isFrac ? "frac" : dia;          // unifica qualquer fração em "frac"
+      if (isFrac) primeiroDia = dia;
       const nums = (m[2].match(/\d{1,3},\d{1,2}/g)||[]).map(x=>parseFloat(x.replace(",",".")));
-      if (nums.length>=2) comp[dia]=[nums[0],nums[1]];
-      if (nums.length>=4) trac[dia]=[nums[2],nums[3]];
+      if (nums.length>=2) comp[key]=[nums[0],nums[1]];
+      if (nums.length>=4) trac[key]=[nums[2],nums[3]];
     }
   }
 
@@ -116,11 +122,11 @@ function parseCertPage(items, pageNum){
       const hm = s.match(/(\d{2}):(\d{2})/);
       if (hm){
         const temps = (s.match(/\d{2,3},\d/g)||[]).map(x=>parseFloat(x.replace(",","."))).slice(0,3);
-        if (temps.length===3){
+        if (temps.length>=1){   // aceita 1, 2 ou 3 leituras (alguma coluna pode estar vazia)
           tempRows.push({
             hhmm:`${hm[1]}:${hm[2]}`,
             h:parseInt(hm[1])+parseInt(hm[2])/60,
-            ini:temps[0], meio:temps[1], fim:temps[2]
+            ini: temps[0] ?? null, meio: temps[1] ?? null, fim: temps[2] ?? null
           });
         }
       }
@@ -128,7 +134,7 @@ function parseCertPage(items, pageNum){
     tempRows.sort((a,b)=>a.h-b.h);
   }
 
-  return { lote, tipo, data, comp, trac, temp:tempRows, page:pageNum };
+  return { lote, tipo, data, comp, trac, temp:tempRows, page:pageNum, primeiroDia };
 }
 
 /* Métricas de temperatura derivadas do PDF */
@@ -142,8 +148,8 @@ function tempMetrics(tempRows){
   // maior variação por hora entre leituras consecutivas (usando a média de cada horário)
   const series = tempRows.map(r=>{
     const vs=[r.ini,r.meio,r.fim].filter(v=>v!=null);
-    return {h:r.h, v: vs.reduce((a,b)=>a+b,0)/vs.length};
-  });
+    return vs.length ? {h:r.h, v: vs.reduce((a,b)=>a+b,0)/vs.length} : null;
+  }).filter(Boolean);
   let maxRate=0;
   for (let i=1;i<series.length;i++){
     const dh=series[i].h-series[i-1].h;
@@ -206,7 +212,9 @@ async function parseXLSX(file){
       tempIni:toNum(r[COL.TEMP_INI]), tempMeio:toNum(r[COL.TEMP_MEIO]), tempFim:toNum(r[COL.TEMP_FIM]),
       status:r[COL.STATUS], motivo:r[COL.MOTIVO], row:i+1
     };
-    map[key]=rec; all.push(rec);
+    if (map[key]){ rec.dup=true; (map[key].dups=map[key].dups||[]).push(i+1); }
+    else { map[key]=rec; }
+    all.push(rec);
   }
   return {map, all};
 }
@@ -216,7 +224,11 @@ function xlsDate(v){
   if (v==null) return null;
   if (v instanceof Date) return `${String(v.getDate()).padStart(2,"0")}/${String(v.getMonth()+1).padStart(2,"0")}/${v.getFullYear()}`;
   if (typeof v==="number"){ const d=XLSX.SSF ? XLSX.SSF.parse_date_code(v):null; if(d) return `${String(d.d).padStart(2,"0")}/${String(d.m).padStart(2,"0")}/${d.y}`; }
-  const s=String(v).trim(); const m=s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/); if(m) return `${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}/${m[3]}`;
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);                       // ISO aaaa-mm-dd
+  if(m) return `${m[3].padStart(2,"0")}/${m[2].padStart(2,"0")}/${m[1]}`;
+  m=s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);                // dd/mm/aaaa
+  if(m) return `${m[1].padStart(2,"0")}/${m[2].padStart(2,"0")}/${m[3]}`;
   return s;
 }
 
@@ -260,7 +272,8 @@ function crossCheck(pdfLots, xls, project){
       ok: (x && pl.data && xlsDate(x.dataFab)) ? (pl.data===xlsDate(x.dataFab)) : null});
 
     // --- Compressão axial ---
-    if (pl.comp["0,6"]) addPairField("Compressão axial","0,6 dias","desprotensão na planilha",pl.comp["0,6"], x?x.desp:[], CFG.TOL_COMP);
+    // 1º dia (fração variável: 0,5 / 0,6 / 0,7 / 0,8) ↔ desprotensão na planilha
+    if (pl.comp["frac"]) addPairField("Compressão axial", (pl.primeiroDia||"0,5")+" dias", "desprotensão na planilha", pl.comp["frac"], x?x.desp:[], CFG.TOL_COMP);
     addPairField("Compressão axial","7 dias","MPa",pl.comp["7"], x?x.comp7:[], CFG.TOL_COMP);
     addPairField("Compressão axial","14 dias","MPa",pl.comp["14"], x?x.comp14:[], CFG.TOL_COMP);
     addPairField("Compressão axial","28 dias","MPa",pl.comp["28"], x?x.comp28:[], CFG.TOL_COMP);
@@ -318,7 +331,16 @@ function crossCheck(pdfLots, xls, project){
     return inProj && !xlsMatchedKeys.has(r.lote);
   });
 
-  return {lots, ignored, project};
+  // lotes cruzados que aparecem mais de uma vez na planilha (usamos a 1ª linha)
+  const dups = [];
+  for (const key of xlsMatchedKeys){
+    const rec = xls.map[key];
+    if (rec && rec.dups && rec.dups.length){
+      dups.push({lote: rec.lote, linhas: [rec.row, ...rec.dups]});
+    }
+  }
+
+  return {lots, ignored, dups, project};
 }
 
 function projectMatches(recProj, sel){
@@ -490,6 +512,10 @@ function renderDash(res){
   // ignorados
   if (res.ignored.length){
     html += `<div class="notice info"><span class="ni">ℹ</span><div><b>${res.ignored.length} lote(s) da planilha do projeto ${window.PROJECT_LABELS[res.project]||res.project} não estão neste databook</b> e foram ignorados (não contam como erro), conforme a regra definida.</div></div>`;
+  }
+  // duplicados na planilha
+  if (res.dups && res.dups.length){
+    html += `<div class="notice warn"><span class="ni">⚠</span><div><b>${res.dups.length} lote(s) aparecem mais de uma vez na planilha</b> — usei a primeira ocorrência de cada: ${res.dups.map(d=>`<span class="mono">${d.lote}</span>`).join(", ")}. Vale conferir se há linhas repetidas.</div></div>`;
   }
 
   // mini panorama de lotes

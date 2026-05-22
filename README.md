@@ -52,7 +52,14 @@ No topo do `app.js`, no objeto `CFG`:
 | `OK_MIN` | 100 | % mínimo para classificar como **Conforme** |
 | `WARN_MIN` | 60 | % mínimo para **Parcial** (abaixo disso, **Não conforme**) |
 
-## Sobre outros projetos (Ferronorte, Malha Paulista)
+## Projetos suportados pelo leitor de PDF
+
+- **FMT — bitola larga** (1º dia de cura tipicamente "0,6 dias")
+- **Malha Paulista — bitola mista** (tipo "Bitola mista"; 1º dia de cura varia por lote: 0,5 / 0,6 / 0,7 / 0,8 dias — o leitor reconhece qualquer fração e a casa com a desprotensão da planilha)
+
+O leitor também tolera lotes em que a coluna "Fim" da tabela de temperatura está vazia.
+
+## Sobre outros projetos (Ferronorte, Malha Paulista bitola larga)
 
 A leitura da planilha é genérica (vale para todos os projetos). A leitura do **PDF** foi calibrada no databook do **FMT**. Quando você tiver um databook de outro projeto, basta enviá-lo: se o layout do "Certificado de Qualidade do Lote" for diferente, ajustamos o leitor para reconhecê-lo. O ideal é validar um projeto de cada vez.
 
