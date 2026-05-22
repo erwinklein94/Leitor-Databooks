@@ -1,6 +1,6 @@
 # Cruzamento Databook × Planilha — DM de Concreto
 
-Site estático que cruza o **databook de produção (PDF) da Cavan** com a **planilha de controle de qualidade (XLSX) da Rumo**, lote a lote, e aponta o que está **conforme**, **parcial** ou **não conforme**, com o percentual de aderência de cada lote.
+Site estático que cruza o **databook de produção (PDF)** com a **planilha de controle de qualidade (XLSX) da Rumo**, lote a lote, e aponta o que está **conforme**, **parcial** ou **não conforme**, com o percentual de aderência de cada lote.
 
 Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona direto no GitHub Pages.
 
@@ -24,7 +24,7 @@ Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona 
 ## Como usar
 
 1. Escolha o **projeto** (FMT, Ferronorte, Malha Paulista mista/larga).
-2. Suba o **databook (PDF)** da Cavan e a **planilha (XLSX)** da Rumo do mesmo período.
+2. Suba o **databook (PDF)** e a **planilha (XLSX)** da Rumo do mesmo período.
 3. Clique em **Cruzar dados**.
 
 ### Abas

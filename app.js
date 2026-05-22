@@ -1,5 +1,5 @@
 /* =====================================================================
-   Cruzamento Databook (PDF Cavan) × Planilha (XLSX Rumo)
+   Cruzamento Databook (PDF) × Planilha (XLSX Rumo)
    Tudo roda no navegador. Sem backend.
    ===================================================================== */
 
