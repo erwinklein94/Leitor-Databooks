@@ -300,6 +300,86 @@
     return parts.join(' | ');
   };
 
+  const levelToUiClass = (level) => {
+    if (level === 'OK') return 'ok';
+    if (level === 'WARN') return 'warn';
+    if (level === 'FAIL') return 'bad';
+    return 'neutral';
+  };
+
+  const getCheckLevelMap = (checks = []) => {
+    const map = new Map();
+    checks.forEach((check) => map.set(check.field, check));
+    return map;
+  };
+
+  const getMetricDisplay = (record, field) => {
+    if (!record) return { value: 'Não encontrado', note: '' };
+    const concrete = record.concrete || record || {};
+    const tempSummary = record.temperatureSummary || {};
+    const mapArray = (arr) => (arr && arr.length ? formatNumberList(arr) : 'Não lido');
+
+    switch (field) {
+      case 'transferencia':
+        return { value: mapArray(concrete.transferencia || []), note: '' };
+      case 'comp7':
+        return { value: mapArray(concrete.comp7 || []), note: '' };
+      case 'comp14':
+        return { value: mapArray(concrete.comp14 || []), note: '' };
+      case 'comp28':
+        return { value: mapArray(concrete.comp28 || []), note: '' };
+      case 'tracao14':
+        return { value: mapArray(concrete.tracao14 || []), note: '' };
+      case 'tracao28':
+        return { value: mapArray(concrete.tracao28 || []), note: '' };
+      case 'tempoCura': {
+        const cureHours = record.tempoCuraHours ?? concrete.curaHoras;
+        const rawCure = record.tempoCuraRaw || concrete.curaRaw || '';
+        if (cureHours !== null && cureHours !== undefined) {
+          return { value: formatHours(cureHours), note: rawCure && !String(rawCure).includes(String(cureHours)) ? rawCure : '' };
+        }
+        return { value: rawCure || 'Não lido', note: '' };
+      }
+      case 'tempMax':
+        return {
+          value: tempSummary.maxTemp === null || tempSummary.maxTemp === undefined ? 'Não lido' : `${formatNumber(tempSummary.maxTemp)} ºC`,
+          note: tempSummary.maxTempAt || ''
+        };
+      case 'tempHourlyVariation':
+        return {
+          value: tempSummary.maxHourlyVariation === null || tempSummary.maxHourlyVariation === undefined ? 'Não lido' : `${formatNumber(tempSummary.maxHourlyVariation)} ºC/h`,
+          note: tempSummary.maxHourlyInfo || ''
+        };
+      case 'tempSpread':
+        return {
+          value: tempSummary.maxSpread === null || tempSummary.maxSpread === undefined ? 'Não lido' : `${formatNumber(tempSummary.maxSpread)} ºC`,
+          note: tempSummary.maxSpreadAt ? `às ${tempSummary.maxSpreadAt}` : ''
+        };
+      default:
+        return { value: 'Não lido', note: '' };
+    }
+  };
+
+  const renderMetricCards = (record, fields, checkMap, emptyText = 'Não encontrado') => {
+    if (!record) return `<div class="metric-card-grid"><div class="metric-card metric-card--empty"><div class="metric-card__value">${escapeHtml(emptyText)}</div></div></div>`;
+    return `<div class="metric-card-grid">${fields.map(({ field, title, unit }) => {
+      const info = getMetricDisplay(record, field);
+      const check = checkMap.get(field);
+      const uiClass = levelToUiClass(check?.level);
+      const badgeText = check?.level === 'FAIL' ? 'Divergente' : check?.level === 'WARN' ? 'Parcial' : check?.level === 'OK' ? 'Igual' : '';
+      const value = info.value || 'Não lido';
+      return `
+        <div class="metric-card ${uiClass !== 'neutral' ? `metric-card--${uiClass}` : ''}">
+          <div class="metric-card__head">
+            <span class="metric-card__title">${escapeHtml(title)}</span>
+            ${badgeText ? `<span class="metric-chip metric-chip--${uiClass}">${badgeText}</span>` : ''}
+          </div>
+          <div class="metric-card__value">${escapeHtml(value)}${unit && value !== 'Não lido' && !String(value).includes(unit) ? ` <span class="metric-card__unit">${escapeHtml(unit)}</span>` : ''}</div>
+          ${info.note ? `<div class="metric-card__note">${escapeHtml(info.note)}</div>` : ''}
+        </div>`;
+    }).join('')}</div>`;
+  };
+
   const normalizeChumbadores = (value) => {
     if (value === null || value === undefined) return [];
     let s = normText(value);
@@ -1018,18 +1098,37 @@
       return;
     }
 
+    const strengthFields = [
+      { field: 'transferencia', title: 'Transf.' },
+      { field: 'comp7', title: '7 dias' },
+      { field: 'comp14', title: '14 dias' },
+      { field: 'comp28', title: '28 dias' }
+    ];
+    const cureFields = [
+      { field: 'tempoCura', title: 'Tempo de cura' },
+      { field: 'tempMax', title: 'Temp. máxima' },
+      { field: 'tempHourlyVariation', title: 'Var. máx./hora' },
+      { field: 'tempSpread', title: 'Var. mesma leitura' }
+    ];
+    const tractionFields = [
+      { field: 'tracao14', title: '14 dias' },
+      { field: 'tracao28', title: '28 dias' }
+    ];
+
     els.readbackTableBody.innerHTML = rows.map((r) => {
       const pdf = r.pdfRecord;
-      const sheet = r.sheetRecord;
-      const pdfConcrete = pdf?.concrete || {};
-      const sheetConcrete = sheet ? {
-        transferencia: sheet.transferencia || [],
-        comp7: sheet.comp7 || [],
-        comp14: sheet.comp14 || [],
-        comp28: sheet.comp28 || [],
-        tracao14: sheet.tracao14 || [],
-        tracao28: sheet.tracao28 || []
-      } : {};
+      const sheet = r.sheetRecord ? {
+        ...r.sheetRecord,
+        concrete: {
+          transferencia: r.sheetRecord.transferencia || [],
+          comp7: r.sheetRecord.comp7 || [],
+          comp14: r.sheetRecord.comp14 || [],
+          comp28: r.sheetRecord.comp28 || [],
+          tracao14: r.sheetRecord.tracao14 || [],
+          tracao28: r.sheetRecord.tracao28 || []
+        }
+      } : null;
+      const checkMap = getCheckLevelMap(r.readback?.checks || []);
       const diverging = (r.readback?.checks || [])
         .filter((c) => c.level !== 'OK' && !c.skipScore)
         .map((c) => c.label)
@@ -1042,12 +1141,12 @@
           <td>${escapeHtml(sheet?.type || '-')}</td>
           <td>${escapeHtml(formatDateBR(pdf?.productionDate) || '-')}</td>
           <td>${escapeHtml(formatDateBR(sheet?.productionDate) || '-')}</td>
-          <td class="small">${escapeHtml(formatStrengthBlock(pdfConcrete))}</td>
-          <td class="small">${escapeHtml(formatStrengthBlock(sheetConcrete))}</td>
-          <td class="small">${escapeHtml(formatCureAndTemperatureBlock(pdf, 'pdf'))}</td>
-          <td class="small">${escapeHtml(formatCureAndTemperatureBlock(sheet, 'sheet'))}</td>
-          <td class="small">${escapeHtml(formatTractionBlock(pdfConcrete))}</td>
-          <td class="small">${escapeHtml(formatTractionBlock(sheetConcrete))}</td>
+          <td>${renderMetricCards(pdf, strengthFields, checkMap, 'Não lido no PDF')}</td>
+          <td>${renderMetricCards(sheet, strengthFields, checkMap, 'Não lido na planilha')}</td>
+          <td>${renderMetricCards(pdf, cureFields, checkMap, 'Não lido no PDF')}</td>
+          <td>${renderMetricCards(sheet, cureFields, checkMap, 'Não lido na planilha')}</td>
+          <td>${renderMetricCards(pdf, tractionFields, checkMap, 'Não lido no PDF')}</td>
+          <td>${renderMetricCards(sheet, tractionFields, checkMap, 'Não lido na planilha')}</td>
           <td class="small">${escapeHtml(diverging)}</td>
         </tr>`;
     }).join('');

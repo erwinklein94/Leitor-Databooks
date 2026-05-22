@@ -535,3 +535,95 @@ html[data-theme="light"] .tab-button.active { background: var(--navy-2); color: 
 .readback-table td:nth-child(13) {
   min-width: 220px;
 }
+
+
+.metric-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.metric-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(255,255,255,.06);
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.metric-card--ok {
+  border-color: rgba(0,214,107,.36);
+  background: rgba(0,214,107,.10);
+}
+.metric-card--warn {
+  border-color: rgba(255,221,0,.38);
+  background: rgba(255,221,0,.10);
+}
+.metric-card--bad {
+  border-color: rgba(255,138,138,.38);
+  background: rgba(255,92,92,.10);
+}
+.metric-card--empty {
+  min-height: auto;
+}
+.metric-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.metric-card__title {
+  font-size: .74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.metric-card__value {
+  font-size: .93rem;
+  font-weight: 900;
+  line-height: 1.35;
+  color: var(--ink);
+  word-break: break-word;
+}
+.metric-card__unit {
+  font-size: .75rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.metric-card__note {
+  font-size: .75rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: .68rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.metric-chip--ok { color: var(--ok); background: var(--ok-bg); }
+.metric-chip--warn { color: var(--warn); background: var(--warn-bg); }
+.metric-chip--bad { color: var(--bad); background: var(--bad-bg); }
+html[data-theme="light"] .metric-card {
+  background: #f9fcff;
+}
+.table-wrap--wide table { min-width: 2140px; }
+.readback-table td:nth-child(7),
+.readback-table td:nth-child(8),
+.readback-table td:nth-child(9),
+.readback-table td:nth-child(10),
+.readback-table td:nth-child(11),
+.readback-table td:nth-child(12) {
+  min-width: 340px;
+}
+@media (max-width: 860px) {
+  .metric-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
