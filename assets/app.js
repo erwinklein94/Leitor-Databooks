@@ -7,7 +7,8 @@
     sheetRecords: [],
     sheetDiagnostics: null,
     results: [],
-    filteredResults: []
+    filteredResults: [],
+    activeTab: 'classification'
   };
 
   const $ = (id) => document.getElementById(id);
@@ -21,6 +22,7 @@
     diagnosticsSection: $('diagnosticsSection'),
     summaryCards: $('summaryCards'),
     resultTableBody: document.querySelector('#resultTable tbody'),
+    readbackTableBody: document.querySelector('#readbackTable tbody'),
     detailPanel: $('detailPanel'),
     diagnostics: $('diagnostics'),
     projectFilter: $('projectFilter'),
@@ -30,7 +32,10 @@
     exportJsonBtn: $('exportJsonBtn'),
     clearBtn: $('clearBtn'),
     searchInput: $('searchInput'),
-    statusFilter: $('statusFilter')
+    statusFilter: $('statusFilter'),
+    tabButtons: document.querySelectorAll('[data-tab]'),
+    classificationPanel: $('classificationPanel'),
+    readbackPanel: $('readbackPanel')
   };
 
   const PROJECT_LABELS = {
@@ -43,11 +48,16 @@
   };
 
   const FIELD_LABELS = {
+    lot: 'Lote',
     project: 'Projeto',
     type: 'Tipo de dormente',
     productionDate: 'Data de produção/fabricação',
     chumbadores: 'Lote de ombreiras/chumbadores',
     transferencia: 'Transferência da protensão / desprotensão',
+    tempoCura: 'Tempo de cura',
+    tempMax: 'Temperatura máxima',
+    tempHourlyVariation: 'Variação máxima por hora',
+    tempSpread: 'Variação máxima na leitura',
     comp7: 'Compressão axial 7 dias',
     comp14: 'Compressão axial 14 dias',
     tracao14: 'Tração na flexão 14 dias',
@@ -156,6 +166,140 @@
     return m ? `${m[3]}/${m[2]}/${m[1]}` : isoDate;
   };
 
+  const parseDurationHours = (value) => {
+    if (value === null || value === undefined || value === '' || value === '_') return null;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.getUTCHours() + value.getUTCMinutes() / 60 + value.getUTCSeconds() / 3600;
+    }
+    const raw = String(value).trim();
+    const normalized = normText(raw);
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeMatch) {
+      return Number(timeMatch[1]) + Number(timeMatch[2]) / 60 + Number(timeMatch[3] || 0) / 3600;
+    }
+    const n = parseNumber(value);
+    if (n === null) return null;
+    if (/DIA|DIAS/.test(normalized)) return n * 24;
+    // A planilha costuma guardar "TEMPO DE CURA (Horas)" como fração de dia do Excel.
+    if (n > 0 && n < 2) return n * 24;
+    return n;
+  };
+
+  const formatHours = (hours) => {
+    if (hours === null || hours === undefined || Number.isNaN(hours)) return '';
+    return `${formatNumber(hours)} h`;
+  };
+
+  const timeToHours = (time) => {
+    const m = String(time || '').match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    return Number(m[1]) + Number(m[2]) / 60 + Number(m[3] || 0) / 3600;
+  };
+
+  const summarizeTemperatures = (readings) => {
+    const validReadings = (readings || [])
+      .map((r) => ({ ...r, temps: (r.temps || []).filter((n) => n !== null && Number.isFinite(n)) }))
+      .filter((r) => r.temps.length);
+    const allTemps = validReadings.flatMap((r) => r.temps);
+    if (!allTemps.length) {
+      return { readings: [], maxTemp: null, maxTempAt: '', maxSpread: null, maxSpreadAt: '', maxHourlyVariation: null, maxHourlyInfo: '' };
+    }
+
+    let maxTemp = -Infinity;
+    let maxTempAt = '';
+    validReadings.forEach((r) => {
+      r.temps.forEach((t, index) => {
+        if (t > maxTemp) {
+          maxTemp = t;
+          maxTempAt = `${r.time || 'leitura'}${r.labels && r.labels[index] ? ` (${r.labels[index]})` : ''}`;
+        }
+      });
+    });
+
+    let maxSpread = null;
+    let maxSpreadAt = '';
+    validReadings.forEach((r) => {
+      if (r.temps.length < 2) return;
+      const spread = Math.max(...r.temps) - Math.min(...r.temps);
+      if (maxSpread === null || spread > maxSpread) {
+        maxSpread = spread;
+        maxSpreadAt = r.time || 'leitura';
+      }
+    });
+
+    let maxHourlyVariation = null;
+    let maxHourlyInfo = '';
+    const maxSensors = Math.max(...validReadings.map((r) => r.temps.length));
+    for (let sensor = 0; sensor < maxSensors; sensor++) {
+      const points = validReadings
+        .map((r) => ({ time: r.time || '', hours: r.hours ?? timeToHours(r.time), temp: r.temps[sensor], label: r.labels && r.labels[sensor] ? r.labels[sensor] : `posição ${sensor + 1}` }))
+        .filter((pnt) => pnt.hours !== null && pnt.temp !== undefined && Number.isFinite(pnt.temp))
+        .sort((a, b) => a.hours - b.hours);
+      for (let i = 1; i < points.length; i++) {
+        const dt = points[i].hours - points[i - 1].hours;
+        if (dt <= 0) continue;
+        const hourly = Math.abs(points[i].temp - points[i - 1].temp) / dt;
+        if (maxHourlyVariation === null || hourly > maxHourlyVariation) {
+          maxHourlyVariation = hourly;
+          maxHourlyInfo = `${points[i - 1].time} → ${points[i].time} (${points[i].label})`;
+        }
+      }
+    }
+
+    return { readings: validReadings, maxTemp, maxTempAt, maxSpread, maxSpreadAt, maxHourlyVariation, maxHourlyInfo };
+  };
+
+  const formatTemperatureSummary = (summary) => {
+    if (!summary || summary.maxTemp === null || summary.maxTemp === undefined) return 'Não lido';
+    const parts = [`máx. ${formatNumber(summary.maxTemp)} ºC${summary.maxTempAt ? ` em ${summary.maxTempAt}` : ''}`];
+    if (summary.maxHourlyVariation !== null && summary.maxHourlyVariation !== undefined) {
+      parts.push(`variação máx. por hora ${formatNumber(summary.maxHourlyVariation)} ºC/h${summary.maxHourlyInfo ? ` (${summary.maxHourlyInfo})` : ''}`);
+    }
+    if (summary.maxSpread !== null && summary.maxSpread !== undefined) {
+      parts.push(`variação máx. na mesma leitura ${formatNumber(summary.maxSpread)} ºC${summary.maxSpreadAt ? ` às ${summary.maxSpreadAt}` : ''}`);
+    }
+    return parts.join('; ');
+  };
+
+  const formatStrengthBlock = (source) => {
+    const comp7 = source.comp7 || [];
+    const comp14 = source.comp14 || [];
+    const comp28 = source.comp28 || [];
+    const transferencia = source.transferencia || [];
+    return [
+      transferencia.length ? `Transf.: ${formatNumberList(transferencia)}` : '',
+      comp7.length ? `7d: ${formatNumberList(comp7)}` : '',
+      comp14.length ? `14d: ${formatNumberList(comp14)}` : '',
+      comp28.length ? `28d: ${formatNumberList(comp28)}` : ''
+    ].filter(Boolean).join(' | ') || 'Não lido';
+  };
+
+  const formatTractionBlock = (source) => {
+    const tracao14 = source.tracao14 || [];
+    const tracao28 = source.tracao28 || [];
+    return [
+      tracao14.length ? `14d: ${formatNumberList(tracao14)}` : '',
+      tracao28.length ? `28d: ${formatNumberList(tracao28)}` : ''
+    ].filter(Boolean).join(' | ') || 'Não lido';
+  };
+
+  const formatCureAndTemperatureBlock = (record, source) => {
+    if (!record) return 'Não encontrado';
+    const concrete = record.concrete || {};
+    const cureHours = record.tempoCuraHours ?? concrete.curaHoras;
+    const rawCure = record.tempoCuraRaw || concrete.curaRaw || '';
+    const tempSummary = record.temperatureSummary || { maxTemp: null };
+    const parts = [];
+    if (cureHours !== null && cureHours !== undefined) parts.push(`Tempo cura: ${formatHours(cureHours)}${rawCure ? ` (${rawCure})` : ''}`);
+    else if (rawCure) parts.push(`Tempo cura: ${rawCure}`);
+    else parts.push('Tempo cura: não lido');
+    parts.push(`Temperatura: ${formatTemperatureSummary(tempSummary)}`);
+    if (source === 'pdf' && record.temperatureReadings && record.temperatureReadings.length) {
+      parts.push(`${record.temperatureReadings.length} leitura(s) de temperatura`);
+    }
+    return parts.join(' | ');
+  };
+
   const normalizeChumbadores = (value) => {
     if (value === null || value === undefined) return [];
     let s = normText(value);
@@ -250,13 +394,14 @@
   };
 
   const extractConcreteValues = (lines) => {
-    const concrete = { transferencia: [], comp7: [], comp14: [], tracao14: [], comp28: [], tracao28: [] };
+    const concrete = { transferencia: [], comp7: [], comp14: [], tracao14: [], comp28: [], tracao28: [], curaRaw: '', curaDias: null, curaHoras: null };
     const lineRegex = /(^|\s)(0[,.]\d+|0|7|14|28)\s+dias\s+(-?\d+(?:[,.]\d+)?)\s+(-?\d+(?:[,.]\d+)?)(?:\s+(-?\d+(?:[,.]\d+)?)\s+(-?\d+(?:[,.]\d+)?))?/i;
 
     for (const line of lines) {
       const m = line.match(lineRegex);
       if (!m) continue;
-      const day = m[2].replace(',', '.');
+      const dayRaw = m[2];
+      const day = dayRaw.replace(',', '.');
       const values = [m[3], m[4], m[5], m[6]].filter(Boolean).map(parseNumber).filter((n) => n !== null);
       if (day === '7') concrete.comp7 = values.slice(0, 2);
       else if (day === '14') {
@@ -267,9 +412,37 @@
         concrete.tracao28 = values.slice(2, 4);
       } else if (day.startsWith('0')) {
         concrete.transferencia = values.slice(0, 3);
+        concrete.curaRaw = `${dayRaw} dias`;
+        concrete.curaDias = parseNumber(dayRaw);
+        concrete.curaHoras = concrete.curaDias !== null ? concrete.curaDias * 24 : null;
       }
     }
     return concrete;
+  };
+
+  const extractTemperatureReadings = (lines) => {
+    const start = lines.findIndex((line) => /ACOMPANHAMENTO\s+DE\s+TEMPERATURA/i.test(line));
+    if (start < 0) return [];
+    const end = lines.findIndex((line, index) => index > start && /PAR[ÂA]METROS\s+DIMENSIONAIS/i.test(line));
+    const relevant = lines.slice(start, end > start ? end : lines.length);
+    const readings = [];
+    for (const line of relevant) {
+      const m = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/);
+      if (!m) continue;
+      if (!/[º°]\s*C/i.test(m[2])) continue;
+      const temps = (m[2].match(/-?\d{1,3}(?:[,.]\d+)?\s*(?:º\s*C|°\s*C|C)?/gi) || [])
+        .map((token) => parseNumber(token.replace(/[º°]?\s*C/gi, '')))
+        .filter((n) => n !== null && n > -30 && n < 120)
+        .slice(0, 3);
+      if (!temps.length) continue;
+      readings.push({
+        time: m[1],
+        hours: timeToHours(m[1]),
+        temps,
+        labels: ['Início', 'Meio', 'Fim'].slice(0, temps.length)
+      });
+    }
+    return readings;
   };
 
   const extractPdfApprovals = (lines) => {
@@ -301,6 +474,8 @@
     const modulus = extractAfterLabel(pageText, /Modulo\s+de\s+Elasticidade/i);
     const ensaiado = extractAfterLabel(pageText, /Dormente\s+ensaiado/i);
     const concrete = extractConcreteValues(lines);
+    const temperatureReadings = extractTemperatureReadings(lines);
+    const temperatureSummary = summarizeTemperatures(temperatureReadings);
     const approvals = extractPdfApprovals(lines);
 
     const project = canonicalProject(context.fileName, context.coverText, pageText, type, clientLine);
@@ -321,6 +496,8 @@
       modulus: normalizeSpaces(modulus),
       ensaiado: normalizeSpaces(ensaiado),
       concrete,
+      temperatureReadings,
+      temperatureSummary,
       approvals,
       rawText: pageText
     };
@@ -420,6 +597,9 @@
       comUsp: findCol(/COM USP/),
       tipoOmbreira: findCol(/TIPO DE OMBREIRAS/),
       loteOmbreira: findCol(/LOTE OMBREIRAS/),
+      tempInicial: findCol(/TEMPERATURA/, /INICIAL|INICIO/),
+      tempMeio: findCol(/TEMPERATURA/, /MEIO/),
+      tempFinal: findCol(/TEMPERATURA/, /FINAL|FIM/),
       desprotInicio: findCol(/DESPRONTENSAO|DESPROTENSAO/, /INICIO/),
       desprotMeio: findCol(/DESPRONTENSAO|DESPROTENSAO/, /MEIO/),
       desprotFim: findCol(/DESPRONTENSAO|DESPROTENSAO/, /FIM/),
@@ -450,6 +630,10 @@
       const transferencia = [getCell(row, cols.desprotInicio), getCell(row, cols.desprotMeio), getCell(row, cols.desprotFim)]
         .map(parseNumber)
         .filter((n) => n !== null);
+      const tempValues = [getCell(row, cols.tempInicial), getCell(row, cols.tempMeio), getCell(row, cols.tempFinal)]
+        .map(parseNumber)
+        .filter((n) => n !== null);
+      const temperatureReadings = tempValues.length ? [{ time: 'Planilha', hours: null, temps: tempValues, labels: ['Inicial', 'Meio', 'Final'].slice(0, tempValues.length) }] : [];
       records.push({
         source: 'sheet',
         rowNumber: r + 1,
@@ -463,6 +647,10 @@
         chumbadoresRaw: normalizeSpaces(getCell(row, cols.loteOmbreira)),
         chumbadoresTokens: normalizeChumbadores(getCell(row, cols.loteOmbreira)),
         transferencia,
+        tempoCuraRaw: normalizeSpaces(getCell(row, cols.tempoCura)),
+        tempoCuraHours: parseDurationHours(getCell(row, cols.tempoCura)),
+        temperatureReadings,
+        temperatureSummary: summarizeTemperatures(temperatureReadings),
         comp7: parseNumberList(getCell(row, cols.comp7)),
         comp14: parseNumberList(getCell(row, cols.comp14)),
         tracao14: parseNumberList(getCell(row, cols.tracao14)),
@@ -497,14 +685,15 @@
       : makeCheck('productionDate', formatDateBR(pdfValue), formatDateBR(sheetValue), 'FAIL', 'Datas diferentes.');
   };
 
-  const makeCheck = (field, pdfValue, sheetValue, level, note = '') => ({
+  const makeCheck = (field, pdfValue, sheetValue, level, note = '', extra = {}) => ({
     field,
     label: FIELD_LABELS[field] || field,
     pdfValue: pdfValue ?? '',
     sheetValue: sheetValue ?? '',
     level,
     note,
-    critical: CRITICAL_FIELDS.has(field)
+    critical: CRITICAL_FIELDS.has(field),
+    ...extra
   });
 
 
@@ -596,15 +785,81 @@
     return makeCheck('sheetStatus', '', sheetRecord.statusRaw, 'OK', motivo || 'Status da planilha não indica reprovação.');
   };
 
-  const choosePdfRecord = (sheetRecord, pdfRecordsByLot) => {
-    const candidates = pdfRecordsByLot.get(sheetRecord.lot) || [];
+
+  const compareDuration = (pdfHours, sheetHours, toleranceHours = 0.5) => {
+    const pdfText = formatHours(pdfHours);
+    const sheetText = formatHours(sheetHours);
+    if ((pdfHours === null || pdfHours === undefined) && (sheetHours === null || sheetHours === undefined)) {
+      return makeCheck('tempoCura', '', '', 'WARN', 'Tempo de cura não foi lido em nenhuma das fontes.', { skipScore: true });
+    }
+    if (pdfHours === null || pdfHours === undefined || sheetHours === null || sheetHours === undefined) {
+      return makeCheck('tempoCura', pdfText, sheetText, 'WARN', 'Tempo de cura ausente em uma das fontes.');
+    }
+    const diff = Math.abs(pdfHours - sheetHours);
+    return diff <= toleranceHours
+      ? makeCheck('tempoCura', pdfText, sheetText, 'OK', `Diferença de ${formatNumber(diff)} h dentro da tolerância ${formatNumber(toleranceHours)} h.`)
+      : makeCheck('tempoCura', pdfText, sheetText, 'FAIL', `Diferença de ${formatNumber(diff)} h fora da tolerância ${formatNumber(toleranceHours)} h.`);
+  };
+
+  const compareTemperatureMetric = (field, pdfValue, sheetValue, toleranceTemp = 0.5) => {
+    const pdfText = pdfValue === null || pdfValue === undefined ? '' : `${formatNumber(pdfValue)} ºC`;
+    const sheetText = sheetValue === null || sheetValue === undefined ? '' : `${formatNumber(sheetValue)} ºC`;
+    if ((pdfValue === null || pdfValue === undefined) && (sheetValue === null || sheetValue === undefined)) {
+      return makeCheck(field, '', '', 'WARN', 'Temperatura não lida nas duas fontes.', { skipScore: true });
+    }
+    if (pdfValue === null || pdfValue === undefined || sheetValue === null || sheetValue === undefined) {
+      return makeCheck(field, pdfText, sheetText, 'WARN', 'Temperatura ausente em uma das fontes.', { skipScore: true });
+    }
+    const diff = Math.abs(pdfValue - sheetValue);
+    return diff <= toleranceTemp
+      ? makeCheck(field, pdfText, sheetText, 'OK', `Diferença de ${formatNumber(diff)} ºC.`)
+      : makeCheck(field, pdfText, sheetText, 'FAIL', `Diferença de ${formatNumber(diff)} ºC.`, { skipScore: false });
+  };
+
+  const buildReadback = (pdfRecord, sheetRecord, tolerance) => {
+    if (!sheetRecord) {
+      const checks = [makeCheck('lot', displayLot(pdfRecord.lot), 'Não encontrado', 'FAIL', 'Lote do Data Book não existe na planilha.')];
+      return { checks, score: 0, okCount: 0, totalChecks: 1 };
+    }
+
+    const pdfConcrete = pdfRecord.concrete || {};
+    const sheetConcrete = {
+      transferencia: sheetRecord.transferencia || [],
+      comp7: sheetRecord.comp7 || [],
+      comp14: sheetRecord.comp14 || [],
+      comp28: sheetRecord.comp28 || [],
+      tracao14: sheetRecord.tracao14 || [],
+      tracao28: sheetRecord.tracao28 || []
+    };
+    const checks = [
+      makeCheck('lot', displayLot(pdfRecord.lot), displayLot(sheetRecord.lot), pdfRecord.lot === sheetRecord.lot ? 'OK' : 'FAIL', pdfRecord.lot === sheetRecord.lot ? 'Lotes iguais.' : 'Lotes diferentes.'),
+      compareType(pdfRecord, sheetRecord),
+      compareDates(pdfRecord.productionDate, sheetRecord.productionDate),
+      compareDuration(pdfConcrete.curaHoras, sheetRecord.tempoCuraHours, 0.5),
+      compareNumberArrays('comp7', pdfConcrete.comp7, sheetConcrete.comp7, tolerance),
+      compareNumberArrays('comp14', pdfConcrete.comp14, sheetConcrete.comp14, tolerance),
+      compareNumberArrays('comp28', pdfConcrete.comp28, sheetConcrete.comp28, tolerance),
+      compareNumberArrays('tracao14', pdfConcrete.tracao14, sheetConcrete.tracao14, tolerance),
+      compareNumberArrays('tracao28', pdfConcrete.tracao28, sheetConcrete.tracao28, tolerance),
+      compareTemperatureMetric('tempMax', pdfRecord.temperatureSummary?.maxTemp, sheetRecord.temperatureSummary?.maxTemp),
+      compareTemperatureMetric('tempHourlyVariation', pdfRecord.temperatureSummary?.maxHourlyVariation, sheetRecord.temperatureSummary?.maxHourlyVariation)
+    ].filter(Boolean);
+
+    const countable = checks.filter((c) => !c.skipScore);
+    const okCount = countable.filter((c) => c.level === 'OK').length;
+    const totalChecks = countable.length;
+    const score = totalChecks ? Math.round((okCount / totalChecks) * 100) : 0;
+    return { checks, score, okCount, totalChecks };
+  };
+
+  const chooseSheetRecord = (pdfRecord, sheetRecordsByLot) => {
+    const candidates = sheetRecordsByLot.get(pdfRecord.lot) || [];
     if (!candidates.length) return null;
-    const sameProject = candidates.find((r) => r.project === sheetRecord.project);
+    const sameProject = candidates.find((r) => r.project === pdfRecord.project);
     return sameProject || candidates[0];
   };
 
-  const classifyResult = (checks, hasPdf) => {
-    if (!hasPdf) return { status: 'RUIM', score: 0, reason: 'Lote não encontrado nos PDFs carregados.' };
+  const classifyResult = (checks) => {
     const considered = checks.filter(Boolean);
     const ok = considered.filter((c) => c.level === 'OK').length;
     const warn = considered.filter((c) => c.level === 'WARN').length;
@@ -618,24 +873,30 @@
   };
 
   const compareRecords = (sheetRecords, pdfRecords, tolerance, projectFilter) => {
-    const pdfRecordsByLot = new Map();
-    pdfRecords.forEach((r) => {
-      if (!pdfRecordsByLot.has(r.lot)) pdfRecordsByLot.set(r.lot, []);
-      pdfRecordsByLot.get(r.lot).push(r);
+    const sheetRecordsByLot = new Map();
+    sheetRecords.forEach((r) => {
+      if (!sheetRecordsByLot.has(r.lot)) sheetRecordsByLot.set(r.lot, []);
+      sheetRecordsByLot.get(r.lot).push(r);
     });
 
-    const filteredSheetRecords = sheetRecords.filter((record) => projectFilter === 'TODOS' || record.project === projectFilter);
+    // Regra operacional: o Data Book é a base da auditoria.
+    // Lotes que existem apenas na planilha são ignorados, porque podem pertencer a outro Data Book.
+    // Lotes que existem no Data Book e não existem na planilha viram erro.
+    const filteredPdfRecords = pdfRecords.filter((record) => projectFilter === 'TODOS' || record.project === projectFilter);
 
-    const results = filteredSheetRecords.map((sheetRecord, idx) => {
-      const pdfRecord = choosePdfRecord(sheetRecord, pdfRecordsByLot);
+    const results = filteredPdfRecords.map((pdfRecord, idx) => {
+      const sheetRecord = chooseSheetRecord(pdfRecord, sheetRecordsByLot);
       let checks = [];
-      if (pdfRecord) {
+      let classification;
+
+      if (sheetRecord) {
         checks = [
           compareSimpleText('project', PROJECT_LABELS[pdfRecord.project], PROJECT_LABELS[sheetRecord.project]),
           compareType(pdfRecord, sheetRecord),
           compareDates(pdfRecord.productionDate, sheetRecord.productionDate),
           compareChumbadores(pdfRecord, sheetRecord),
           compareNumberArrays('transferencia', pdfRecord.concrete.transferencia, sheetRecord.transferencia, tolerance, true),
+          compareDuration(pdfRecord.concrete.curaHoras, sheetRecord.tempoCuraHours, 0.5),
           compareNumberArrays('comp7', pdfRecord.concrete.comp7, sheetRecord.comp7, tolerance),
           compareNumberArrays('comp14', pdfRecord.concrete.comp14, sheetRecord.comp14, tolerance),
           compareNumberArrays('tracao14', pdfRecord.concrete.tracao14, sheetRecord.tracao14, tolerance),
@@ -644,38 +905,59 @@
           comparePdfApprovals(pdfRecord),
           compareSheetStatus(sheetRecord)
         ].filter(Boolean);
+        classification = classifyResult(checks);
       } else {
-        checks = [makeCheck('project', '', PROJECT_LABELS[sheetRecord.project], 'FAIL', 'Sem PDF correspondente.')];
+        checks = [
+          makeCheck('sheetStatus', `${pdfRecord.fileName}, pág. ${pdfRecord.page}`, 'Não encontrado', 'FAIL', 'Lote existe no Data Book, mas não foi encontrado na planilha.')
+        ];
+        classification = { status: 'RUIM', score: 0, reason: 'Lote está no Data Book, mas não foi encontrado na planilha.' };
       }
 
-      const classification = classifyResult(checks, Boolean(pdfRecord));
+      const readback = buildReadback(pdfRecord, sheetRecord, tolerance);
       const okCount = checks.filter((c) => c.level === 'OK').length;
       const failOrWarn = checks.filter((c) => c.level !== 'OK');
       return {
         id: `res-${idx}`,
-        lot: sheetRecord.lot,
-        project: sheetRecord.project,
+        lot: pdfRecord.lot,
+        project: pdfRecord.project,
         status: classification.status,
         score: classification.score,
         reason: classification.reason,
         okCount,
         totalChecks: checks.length,
         divergences: failOrWarn.map((c) => `${c.label}: ${c.note}`).join(' | '),
-        pdfPage: pdfRecord ? `${pdfRecord.fileName}, pág. ${pdfRecord.page}` : 'Não encontrado',
-        sheetRow: sheetRecord.rowNumber,
+        pdfPage: `${pdfRecord.fileName}, pág. ${pdfRecord.page}`,
+        sheetRow: sheetRecord ? sheetRecord.rowNumber : 'Não encontrado',
         pdfRecord,
         sheetRecord,
-        checks
+        checks,
+        readback
       };
     });
 
-    const pdfLots = new Set(pdfRecords.filter((r) => projectFilter === 'TODOS' || r.project === projectFilter).map((r) => r.lot));
-    const sheetLots = new Set(filteredSheetRecords.map((r) => r.lot));
-    const onlyPdf = Array.from(pdfLots).filter((lot) => !sheetLots.has(lot)).sort();
-    return { results, onlyPdf };
+    const pdfLots = new Set(filteredPdfRecords.map((r) => r.lot));
+    const sheetLotsInFilter = new Set(
+      sheetRecords
+        .filter((r) => projectFilter === 'TODOS' || r.project === projectFilter)
+        .map((r) => r.lot)
+    );
+    const onlyPdf = Array.from(pdfLots).filter((lot) => !sheetLotsInFilter.has(lot)).sort();
+    const ignoredSheetOnly = Array.from(sheetLotsInFilter).filter((lot) => !pdfLots.has(lot)).sort();
+    return { results, onlyPdf, ignoredSheetOnly };
   };
 
-  const renderSummary = (results, onlyPdf = []) => {
+  const setActiveTab = (tab) => {
+    state.activeTab = tab;
+    els.tabButtons.forEach((button) => {
+      const active = button.getAttribute('data-tab') === tab;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    if (els.classificationPanel) els.classificationPanel.classList.toggle('hidden', tab !== 'classification');
+    if (els.readbackPanel) els.readbackPanel.classList.toggle('hidden', tab !== 'readback');
+  };
+
+  const renderSummary = (results, onlyPdf = [], ignoredSheetOnly = []) => {
     const total = results.length;
     const ok = results.filter((r) => r.status === 'OK').length;
     const parcial = results.filter((r) => r.status === 'PARCIAL').length;
@@ -688,7 +970,8 @@
       { label: 'Parciais', value: parcial, cls: 'warn' },
       { label: 'Ruins', value: ruim, cls: 'bad' },
       { label: 'Acerto médio', value: `${avg}%`, cls: '' },
-      { label: 'Só no PDF', value: onlyPdf.length, cls: onlyPdf.length ? 'warn' : '' }
+      { label: 'Só no Data Book', value: onlyPdf.length, cls: onlyPdf.length ? 'bad' : '' },
+      { label: 'Só na planilha ignorados', value: ignoredSheetOnly.length, cls: '' }
     ].map((card) => `<div class="summary-card ${card.cls}"><strong>${card.value}</strong><span>${card.label}</span></div>`).join('');
   };
 
@@ -704,6 +987,7 @@
 
     if (!state.filteredResults.length) {
       els.resultTableBody.innerHTML = '<tr><td colspan="9" class="small">Nenhum resultado com os filtros atuais.</td></tr>';
+      renderReadbackTable();
       return;
     }
 
@@ -721,6 +1005,50 @@
           <td><span class="small">${escapeHtml(r.pdfPage)}</span></td>
           <td>${r.sheetRow}</td>
           <td><button class="link-button" data-detail="${r.id}">abrir</button></td>
+        </tr>`;
+    }).join('');
+    renderReadbackTable();
+  };
+
+  const renderReadbackTable = () => {
+    if (!els.readbackTableBody) return;
+    const rows = state.filteredResults;
+    if (!rows.length) {
+      els.readbackTableBody.innerHTML = '<tr><td colspan="13" class="small">Nenhum lote para mostrar com os filtros atuais.</td></tr>';
+      return;
+    }
+
+    els.readbackTableBody.innerHTML = rows.map((r) => {
+      const pdf = r.pdfRecord;
+      const sheet = r.sheetRecord;
+      const pdfConcrete = pdf?.concrete || {};
+      const sheetConcrete = sheet ? {
+        transferencia: sheet.transferencia || [],
+        comp7: sheet.comp7 || [],
+        comp14: sheet.comp14 || [],
+        comp28: sheet.comp28 || [],
+        tracao14: sheet.tracao14 || [],
+        tracao28: sheet.tracao28 || []
+      } : {};
+      const diverging = (r.readback?.checks || [])
+        .filter((c) => c.level !== 'OK' && !c.skipScore)
+        .map((c) => c.label)
+        .join(', ') || 'Sem divergências nos campos desta aba';
+      return `
+        <tr>
+          <td><strong>${displayLot(r.lot)}</strong><div class="small">${PROJECT_LABELS[r.project] || r.project}</div></td>
+          <td><span class="badge ${getStatusClass(r.status)}">${r.status}</span><div class="small">Leitura: <strong>${r.readback?.score ?? 0}%</strong> (${r.readback?.okCount ?? 0}/${r.readback?.totalChecks ?? 0})</div></td>
+          <td>${escapeHtml(pdf?.type || '-')}</td>
+          <td>${escapeHtml(sheet?.type || '-')}</td>
+          <td>${escapeHtml(formatDateBR(pdf?.productionDate) || '-')}</td>
+          <td>${escapeHtml(formatDateBR(sheet?.productionDate) || '-')}</td>
+          <td class="small">${escapeHtml(formatStrengthBlock(pdfConcrete))}</td>
+          <td class="small">${escapeHtml(formatStrengthBlock(sheetConcrete))}</td>
+          <td class="small">${escapeHtml(formatCureAndTemperatureBlock(pdf, 'pdf'))}</td>
+          <td class="small">${escapeHtml(formatCureAndTemperatureBlock(sheet, 'sheet'))}</td>
+          <td class="small">${escapeHtml(formatTractionBlock(pdfConcrete))}</td>
+          <td class="small">${escapeHtml(formatTractionBlock(sheetConcrete))}</td>
+          <td class="small">${escapeHtml(diverging)}</td>
         </tr>`;
     }).join('');
   };
@@ -759,8 +1087,8 @@
         <div>
           <h3>Dados lidos</h3>
           <p class="small"><strong>PDF:</strong> ${escapeHtml(r.pdfRecord ? `${r.pdfRecord.fileName}, página ${r.pdfRecord.page}` : 'não encontrado')}</p>
-          <p class="small"><strong>Planilha:</strong> linha ${r.sheetRow}, status: ${escapeHtml(r.sheetRecord.statusRaw || '-')}</p>
-          ${r.sheetRecord.motivo ? `<p class="small"><strong>Motivo/observação:</strong> ${escapeHtml(r.sheetRecord.motivo)}</p>` : ''}
+          <p class="small"><strong>Planilha:</strong> ${r.sheetRecord ? `linha ${r.sheetRow}, status: ${escapeHtml(r.sheetRecord.statusRaw || '-')}` : 'lote não encontrado'}</p>
+          ${r.sheetRecord && r.sheetRecord.motivo ? `<p class="small"><strong>Motivo/observação:</strong> ${escapeHtml(r.sheetRecord.motivo)}</p>` : ''}
           <details class="details-box" open>
             <summary>Texto extraído da página do PDF</summary>
             <pre class="raw-box">${pdfRaw}</pre>
@@ -770,7 +1098,7 @@
     els.detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const renderDiagnostics = (onlyPdf = []) => {
+  const renderDiagnostics = (onlyPdf = [], ignoredSheetOnly = []) => {
     const pdfCards = state.pdfDiagnostics.map((d) => `
       <div class="diagnostic-card">
         <h3>${escapeHtml(d.fileName)}</h3>
@@ -795,12 +1123,19 @@
 
     const onlyPdfCard = onlyPdf.length ? `
       <div class="diagnostic-card">
-        <h3>Lotes encontrados só no PDF</h3>
-        <p class="small">Estes lotes foram lidos nos Data Books, mas não entraram na comparação porque não apareceram na planilha filtrada.</p>
+        <h3>Lotes encontrados só no Data Book</h3>
+        <p class="small">Estes lotes viram erro, porque aparecem no Data Book carregado e não foram encontrados na planilha.</p>
         <p>${onlyPdf.map((lot) => `<span class="pill">${displayLot(lot)}</span>`).join(' ')}</p>
       </div>` : '';
 
-    els.diagnostics.innerHTML = `${sheetCard}${pdfCards}${onlyPdfCard}`;
+    const ignoredSheetCard = ignoredSheetOnly.length ? `
+      <div class="diagnostic-card">
+        <h3>Lotes ignorados porque estão só na planilha</h3>
+        <p class="small">Estes lotes não existem nos PDFs carregados, então não são considerados erro do Data Book.</p>
+        <p>${ignoredSheetOnly.map((lot) => `<span class="pill">${displayLot(lot)}</span>`).join(' ')}</p>
+      </div>` : '';
+
+    els.diagnostics.innerHTML = `${sheetCard}${pdfCards}${onlyPdfCard}${ignoredSheetCard}`;
     els.diagnosticsSection.classList.remove('hidden');
   };
 
@@ -811,10 +1146,12 @@
 
   const exportCsv = () => {
     if (!state.results.length) return;
-    const header = ['lote', 'projeto', 'status', 'acerto_percentual', 'campos_ok', 'campos_total', 'divergencias', 'pdf_pagina', 'linha_planilha'];
+    const header = ['lote', 'projeto', 'status', 'acerto_percentual', 'acerto_leitura_percentual', 'campos_ok', 'campos_total', 'divergencias', 'pdf_pagina', 'linha_planilha', 'pdf_compressao', 'planilha_compressao', 'pdf_tempo_temperatura', 'planilha_tempo_temperatura', 'pdf_tracao', 'planilha_tracao'];
     const rows = state.results.map((r) => [
-      displayLot(r.lot), PROJECT_LABELS[r.project] || r.project, r.status, r.score, r.okCount, r.totalChecks,
-      r.divergences, r.pdfPage, r.sheetRow
+      displayLot(r.lot), PROJECT_LABELS[r.project] || r.project, r.status, r.score, r.readback?.score ?? '', r.okCount, r.totalChecks,
+      r.divergences, r.pdfPage, r.sheetRow, formatStrengthBlock(r.pdfRecord?.concrete || {}), formatStrengthBlock(r.sheetRecord || {}),
+      formatCureAndTemperatureBlock(r.pdfRecord, 'pdf'), formatCureAndTemperatureBlock(r.sheetRecord, 'sheet'),
+      formatTractionBlock(r.pdfRecord?.concrete || {}), formatTractionBlock(r.sheetRecord || {})
     ]);
     const csv = [header, ...rows].map((row) => row.map(toCsvValue).join(';')).join('\n');
     downloadBlob(csv, `comparacao_lotes_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
@@ -827,11 +1164,13 @@
       projeto: PROJECT_LABELS[r.project] || r.project,
       status: r.status,
       acertoPercentual: r.score,
+      acertoLeituraPercentual: r.readback?.score ?? null,
       motivoClassificacao: r.reason,
       pdf: r.pdfRecord ? { arquivo: r.pdfRecord.fileName, pagina: r.pdfRecord.page } : null,
       linhaPlanilha: r.sheetRow,
       divergencias: r.checks.filter((c) => c.level !== 'OK'),
-      comparacoes: r.checks
+      comparacoes: r.checks,
+      leituraLadoALado: r.readback
     }));
     downloadBlob(JSON.stringify(payload, null, 2), `comparacao_lotes_${new Date().toISOString().slice(0, 10)}.json`, 'application/json;charset=utf-8');
   };
@@ -858,6 +1197,8 @@
     els.resultsSection.classList.add('hidden');
     els.diagnosticsSection.classList.add('hidden');
     els.detailPanel.classList.add('hidden');
+    if (els.readbackTableBody) els.readbackTableBody.innerHTML = '';
+    setActiveTab('classification');
     els.statusPanel.innerHTML = '';
   };
 
@@ -887,11 +1228,11 @@
       state.sheetRecords = sheetOutput.records;
       state.sheetDiagnostics = sheetOutput.diagnostics;
 
-      const { results, onlyPdf } = compareRecords(state.sheetRecords, state.pdfRecords, tolerance, els.projectFilter.value);
+      const { results, onlyPdf, ignoredSheetOnly } = compareRecords(state.sheetRecords, state.pdfRecords, tolerance, els.projectFilter.value);
       state.results = results;
-      renderSummary(results, onlyPdf);
+      renderSummary(results, onlyPdf, ignoredSheetOnly);
       renderResultsTable();
-      renderDiagnostics(onlyPdf);
+      renderDiagnostics(onlyPdf, ignoredSheetOnly);
       els.resultsSection.classList.remove('hidden');
 
       setMessage(`Comparação concluída: <strong>${results.length}</strong> lote(s) analisado(s), <strong>${state.pdfRecords.length}</strong> certificado(s) lido(s) nos PDF(s) e <strong>${state.sheetRecords.length}</strong> linha(s) de produção lida(s) na planilha.`, 'success');
@@ -909,6 +1250,9 @@
   els.clearBtn.addEventListener('click', resetResults);
   els.searchInput.addEventListener('input', renderResultsTable);
   els.statusFilter.addEventListener('change', renderResultsTable);
+  els.tabButtons.forEach((button) => {
+    button.addEventListener('click', () => setActiveTab(button.getAttribute('data-tab')));
+  });
   els.resultTableBody.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-detail]');
     if (btn) renderDetail(btn.getAttribute('data-detail'));

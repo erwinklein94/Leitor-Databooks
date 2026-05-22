@@ -14,8 +14,26 @@ O processamento acontece 100% no navegador. Nenhum arquivo é enviado para servi
 3. Selecione a planilha XLSX de controle.
 4. Escolha o projeto ou mantenha "Todos os projetos detectados".
 5. Clique em **Comparar lotes**.
-6. Use a tabela final para abrir o detalhe de cada lote.
-7. Exporte o resultado em CSV ou JSON, se necessário.
+6. Use a aba **Classificação** para ver os lotes OK, parciais e ruins.
+7. Use a aba **Leitura lado a lado** para conferir exatamente o que o leitor conseguiu capturar do PDF e da planilha.
+8. Exporte o resultado em CSV ou JSON, se necessário.
+
+## Aba Leitura lado a lado
+
+A aba mostra, para cada lote do Data Book:
+
+- lote e projeto;
+- tipo de dormente lido no PDF e na planilha;
+- data de produção/fabricação;
+- compressão axial em todos os dias capturados pelo leitor;
+- tempo de cura;
+- temperatura máxima encontrada;
+- maior variação por hora calculada a partir das leituras do PDF;
+- maior variação na mesma leitura de temperatura, comparando início/meio/fim quando houver;
+- tração na flexão em todos os dias capturados pelo leitor;
+- percentual de acerto da leitura contra a planilha.
+
+O percentual da aba de leitura considera lote, tipo, data, tempo de cura, compressão axial e tração na flexão. Temperatura entra no percentual quando houver valor nas duas fontes. Quando só o PDF possui temperatura, ela é exibida como informação de auditoria, sem penalizar automaticamente o percentual.
 
 ## Como publicar no GitHub Pages
 
@@ -27,6 +45,7 @@ index.html
 assets/app.js
 assets/styles.css
 README.md
+.nojekyll
 ```
 
 3. No GitHub, acesse **Settings > Pages**.
@@ -58,7 +77,7 @@ A detecção usa o nome do arquivo, o texto da capa do Data Book e o cabeçalho 
 
 ## Campos comparados
 
-A versão inicial compara os principais pontos operacionais:
+A versão compara os principais pontos operacionais:
 
 - lote;
 - projeto;
@@ -66,6 +85,8 @@ A versão inicial compara os principais pontos operacionais:
 - data de produção/fabricação;
 - lote de ombreiras/chumbadores;
 - transferência da protensão/desprotensão, quando legível;
+- tempo de cura;
+- temperatura máxima e variações calculadas, quando legíveis;
 - compressão axial aos 7, 14 e 28 dias;
 - tração na flexão aos 14 e 28 dias;
 - status A/R detectado no PDF;
@@ -73,11 +94,18 @@ A versão inicial compara os principais pontos operacionais:
 
 ## Classificação
 
-- **OK**: campos comparados bateram dentro da tolerância.
-- **PARCIAL**: o lote foi encontrado, mas existe divergência, aviso ou campo ausente.
-- **RUIM**: lote não encontrado no PDF, muitas divergências ou divergência crítica forte.
+A comparação usa o Data Book como base da auditoria:
 
-A tolerância numérica padrão é `0,05`, mas pode ser ajustada na tela.
+- lotes que aparecem **apenas na planilha** são ignorados, pois podem pertencer a outro Data Book;
+- lotes que aparecem **no Data Book e não aparecem na planilha** são classificados como **RUIM**.
+
+Regras de status:
+
+- **OK**: campos comparados bateram dentro da tolerância.
+- **PARCIAL**: o lote foi encontrado nas duas fontes, mas existe divergência, aviso ou campo ausente.
+- **RUIM**: lote do Data Book não encontrado na planilha, muitas divergências ou divergência crítica forte.
+
+A tolerância numérica padrão é `0,05`, mas pode ser ajustada na tela. Para tempo de cura, a tolerância operacional usada na comparação é de `0,5 hora`.
 
 ## Limitações conhecidas
 
@@ -90,9 +118,8 @@ A tolerância numérica padrão é `0,05`, mas pode ser ajustada na tela.
 
 - `index.html`: interface principal.
 - `assets/styles.css`: estilo visual responsivo.
-- `assets/app.js`: leitura de PDFs, leitura de XLSX, normalização, comparação, classificação e exportação.
+- `assets/app.js`: leitura de PDFs, leitura de XLSX, normalização, comparação, classificação, aba lado a lado e exportação.
 
 ## Aparência visual
 
 Esta versão usa o mesmo padrão visual do Hub de Qualidade: tema escuro/claro, cartão principal com marca Rumo, gradientes em azul institucional, botão amarelo de ação e link de retorno para a página principal.
-

@@ -108,10 +108,15 @@
 
         <details class="details-box">
           <summary>Campos comparados nesta versão</summary>
+          <p class="muted">
+            A comparação usa o Data Book como base: lotes que aparecem apenas na planilha são ignorados;
+            lotes que aparecem no Data Book e não aparecem na planilha são marcados como erro.
+          </p>
           <div class="tag-list">
             <span>Lote</span><span>Projeto</span><span>Data de produção</span><span>Lote de ombreiras/chumbadores</span>
             <span>Compressão axial 7 dias</span><span>Compressão axial 14 dias</span><span>Tração 14 dias</span>
-            <span>Compressão axial 28 dias</span><span>Tração 28 dias</span><span>Desprotensão/transferência</span>
+            <span>Compressão axial 28 dias</span><span>Tração 28 dias</span><span>Tempo de cura</span>
+            <span>Temperatura máxima</span><span>Variação máxima por hora</span><span>Desprotensão/transferência</span>
             <span>Status e motivo da planilha</span><span>Status A/R do PDF</span>
           </div>
         </details>
@@ -134,42 +139,82 @@
 
         <div id="summaryCards" class="summary-grid"></div>
 
-        <div class="filters-row">
-          <label>
-            Filtrar resultado
-            <input id="searchInput" type="search" placeholder="Digite lote, projeto, status ou divergência..." />
-          </label>
-          <label>
-            Mostrar
-            <select id="statusFilter">
-              <option value="TODOS">Todos</option>
-              <option value="OK">OK</option>
-              <option value="PARCIAL">Parcialmente bons</option>
-              <option value="RUIM">Ruins</option>
-            </select>
-          </label>
+        <div class="tab-bar" role="tablist" aria-label="Abas do resultado">
+          <button class="tab-button active" type="button" data-tab="classification" role="tab" aria-selected="true">Classificação</button>
+          <button class="tab-button" type="button" data-tab="readback" role="tab" aria-selected="false">Leitura lado a lado</button>
         </div>
 
-        <div class="table-wrap">
-          <table id="resultTable">
-            <thead>
-              <tr>
-                <th>Lote</th>
-                <th>Projeto</th>
-                <th>Status</th>
-                <th>Acerto</th>
-                <th>Campos OK</th>
-                <th>Divergências</th>
-                <th>Página PDF</th>
-                <th>Linha planilha</th>
-                <th>Detalhe</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div id="classificationPanel" class="tab-panel">
+          <div class="filters-row">
+            <label>
+              Filtrar resultado
+              <input id="searchInput" type="search" placeholder="Digite lote, projeto, status ou divergência..." />
+            </label>
+            <label>
+              Mostrar
+              <select id="statusFilter">
+                <option value="TODOS">Todos</option>
+                <option value="OK">OK</option>
+                <option value="PARCIAL">Parcialmente bons</option>
+                <option value="RUIM">Ruins</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table id="resultTable">
+              <thead>
+                <tr>
+                  <th>Lote</th>
+                  <th>Projeto</th>
+                  <th>Status</th>
+                  <th>Acerto</th>
+                  <th>Campos OK</th>
+                  <th>Divergências</th>
+                  <th>Página PDF</th>
+                  <th>Linha planilha</th>
+                  <th>Detalhe</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div id="detailPanel" class="detail-panel hidden"></div>
         </div>
 
-        <div id="detailPanel" class="detail-panel hidden"></div>
+        <div id="readbackPanel" class="tab-panel hidden">
+          <div class="readback-intro">
+            <h3>Leitura extraída do PDF e da planilha</h3>
+            <p class="muted">
+              Esta aba mostra, lote a lote, exatamente o que o leitor conseguiu capturar nas duas fontes.
+              O percentual de leitura considera lote, tipo, data, tempo de cura, compressão axial e tração na flexão.
+              Temperatura entra no percentual quando existir valor dos dois lados.
+            </p>
+          </div>
+          <div class="table-wrap table-wrap--wide">
+            <table id="readbackTable" class="readback-table">
+              <thead>
+                <tr>
+                  <th>Lote / Projeto</th>
+                  <th>Status / % leitura</th>
+                  <th>Tipo PDF</th>
+                  <th>Tipo Planilha</th>
+                  <th>Data PDF</th>
+                  <th>Data Planilha</th>
+                  <th>Compressão axial PDF</th>
+                  <th>Compressão axial Planilha</th>
+                  <th>Tempo cura / Temperatura PDF</th>
+                  <th>Tempo cura / Temperatura Planilha</th>
+                  <th>Tração PDF</th>
+                  <th>Tração Planilha</th>
+                  <th>Divergências desta aba</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section id="diagnosticsSection" class="panel hidden" aria-labelledby="diagnostico-title">
