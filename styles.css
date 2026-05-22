@@ -173,6 +173,44 @@ html[data-theme="light"] .proj-pill{background:var(--navy-2);color:#fff}
 /* ---------- Shell ---------- */
 .wrap{width:min(1440px,calc(100% - 28px));margin:0 auto;padding:22px 0 60px}
 
+.hub-return{
+  margin:0 0 18px;
+  padding:22px 24px;
+  border:1px solid rgba(0,59,112,.12);
+  border-radius:28px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 18px 46px rgba(0,22,45,.16);
+}
+.hub-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:11px 18px;
+  border-radius:11px;
+  background:var(--navy-2);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 12px 28px rgba(0,15,30,.22);
+  text-decoration:none;
+  font-weight:950;
+  letter-spacing:-.01em;
+  transition:transform .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.hub-back:hover{
+  transform:translateY(-1px);
+  background:#003b70;
+  box-shadow:0 16px 34px rgba(0,15,30,.28);
+}
+.hub-back:focus-visible{
+  outline:3px solid rgba(255,221,0,.76);
+  outline-offset:3px;
+}
+html[data-theme="light"] .hub-return{
+  background:#fff;
+  box-shadow:var(--shadow);
+}
+
 /* ---------- Hero ---------- */
 .hero{
   display:grid;
@@ -460,6 +498,7 @@ html[data-theme="light"] table.cmp th{background:#f4f8fb}html[data-theme="light"
 @media(max-width:700px){
   .topbar-inner,.wrap{width:min(100% - 18px,1440px)}
   .topbar-inner{align-items:flex-start}.brand-mark{width:96px;min-width:96px;height:54px}.brand-mark img{max-width:84%;max-height:74%}.brand-txt b{font-size:.9rem;white-space:normal}.header-actions{width:100%;justify-content:flex-start}.topbar-spacer{display:none}
+  .hub-return{padding:18px 16px;border-radius:24px}.hub-back{width:100%;min-height:43px;padding:10px 14px;font-size:.92rem}
   .hero{padding:22px 18px;border-radius:24px}h1.title{font-size:clamp(2rem,12vw,3.35rem)}.subtitle{font-size:.95rem}
   .kpis{grid-template-columns:1fr}.section-b,.setup-body{padding:18px}.setup-foot,.setup-head,.section-h{padding-left:18px;padding-right:18px}.cmp-head{padding:14px 16px}.cmp .res{text-align:left}.tabs{border-radius:16px}
 }
