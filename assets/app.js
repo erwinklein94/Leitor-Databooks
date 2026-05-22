@@ -881,6 +881,31 @@
       : makeCheck('tempoCura', pdfText, sheetText, 'FAIL', `Diferença de ${formatNumber(diff)} h fora da tolerância ${formatNumber(toleranceHours)} h.`);
   };
 
+
+  const comparePdfTemperatureLimits = (pdfRecord, options = {}) => {
+    const summary = pdfRecord?.temperatureSummary || {};
+    const extra = options.skipScore ? { skipScore: true } : {};
+    const checks = [];
+
+    if (summary.maxTemp === null || summary.maxTemp === undefined) {
+      checks.push(makeCheck('tempMax', 'Não lido', 'Limite: 60 ºC', 'WARN', 'Temperatura máxima não foi lida no Data Book.', extra));
+    } else if (summary.maxTemp <= 60) {
+      checks.push(makeCheck('tempMax', `${formatNumber(summary.maxTemp)} ºC${summary.maxTempAt ? ` em ${summary.maxTempAt}` : ''}`, 'Limite: 60 ºC', 'OK', 'Temperatura máxima dentro do limite de 60 ºC.', extra));
+    } else {
+      checks.push(makeCheck('tempMax', `${formatNumber(summary.maxTemp)} ºC${summary.maxTempAt ? ` em ${summary.maxTempAt}` : ''}`, 'Limite: 60 ºC', 'FAIL', 'Temperatura máxima ultrapassou 60 ºC.', { ...extra, critical: true }));
+    }
+
+    if (summary.maxHourlyVariation === null || summary.maxHourlyVariation === undefined) {
+      checks.push(makeCheck('tempHourlyVariation', 'Não lido', 'Limite: 20 ºC/h', 'WARN', 'Variação de temperatura por hora não foi lida no Data Book.', extra));
+    } else if (summary.maxHourlyVariation <= 20) {
+      checks.push(makeCheck('tempHourlyVariation', `${formatNumber(summary.maxHourlyVariation)} ºC/h${summary.maxHourlyInfo ? ` (${summary.maxHourlyInfo})` : ''}`, 'Limite: 20 ºC/h', 'OK', 'Variação máxima por hora dentro do limite de 20 ºC/h.', extra));
+    } else {
+      checks.push(makeCheck('tempHourlyVariation', `${formatNumber(summary.maxHourlyVariation)} ºC/h${summary.maxHourlyInfo ? ` (${summary.maxHourlyInfo})` : ''}`, 'Limite: 20 ºC/h', 'FAIL', 'Variação de temperatura ultrapassou 20 ºC dentro de uma hora.', { ...extra, critical: true }));
+    }
+
+    return checks;
+  };
+
   const compareTemperatureMetric = (field, pdfValue, sheetValue, toleranceTemp = 0.5) => {
     const pdfText = pdfValue === null || pdfValue === undefined ? '' : `${formatNumber(pdfValue)} ºC`;
     const sheetText = sheetValue === null || sheetValue === undefined ? '' : `${formatNumber(sheetValue)} ºC`;
@@ -898,7 +923,10 @@
 
   const buildReadback = (pdfRecord, sheetRecord, tolerance) => {
     if (!sheetRecord) {
-      const checks = [makeCheck('lot', displayLot(pdfRecord.lot), 'Não encontrado', 'FAIL', 'Lote do Data Book não existe na planilha.')];
+      const checks = [
+        makeCheck('lot', displayLot(pdfRecord.lot), 'Não encontrado', 'FAIL', 'Lote do Data Book não existe na planilha.'),
+        ...comparePdfTemperatureLimits(pdfRecord, { skipScore: true })
+      ];
       return { checks, score: 0, okCount: 0, totalChecks: 1 };
     }
 
@@ -921,8 +949,7 @@
       compareNumberArrays('comp28', pdfConcrete.comp28, sheetConcrete.comp28, tolerance),
       compareNumberArrays('tracao14', pdfConcrete.tracao14, sheetConcrete.tracao14, tolerance),
       compareNumberArrays('tracao28', pdfConcrete.tracao28, sheetConcrete.tracao28, tolerance),
-      compareTemperatureMetric('tempMax', pdfRecord.temperatureSummary?.maxTemp, sheetRecord.temperatureSummary?.maxTemp),
-      compareTemperatureMetric('tempHourlyVariation', pdfRecord.temperatureSummary?.maxHourlyVariation, sheetRecord.temperatureSummary?.maxHourlyVariation)
+      ...comparePdfTemperatureLimits(pdfRecord, { skipScore: true })
     ].filter(Boolean);
 
     const countable = checks.filter((c) => !c.skipScore);
@@ -977,6 +1004,7 @@
           compareChumbadores(pdfRecord, sheetRecord),
           compareNumberArrays('transferencia', pdfRecord.concrete.transferencia, sheetRecord.transferencia, tolerance, true),
           compareDuration(pdfRecord.concrete.curaHoras, sheetRecord.tempoCuraHours, 0.5),
+          ...comparePdfTemperatureLimits(pdfRecord),
           compareNumberArrays('comp7', pdfRecord.concrete.comp7, sheetRecord.comp7, tolerance),
           compareNumberArrays('comp14', pdfRecord.concrete.comp14, sheetRecord.comp14, tolerance),
           compareNumberArrays('tracao14', pdfRecord.concrete.tracao14, sheetRecord.tracao14, tolerance),
@@ -1104,11 +1132,14 @@
       { field: 'comp14', title: '14 dias' },
       { field: 'comp28', title: '28 dias' }
     ];
-    const cureFields = [
+    const pdfCureFields = [
       { field: 'tempoCura', title: 'Tempo de cura' },
       { field: 'tempMax', title: 'Temp. máxima' },
       { field: 'tempHourlyVariation', title: 'Var. máx./hora' },
       { field: 'tempSpread', title: 'Var. mesma leitura' }
+    ];
+    const sheetCureFields = [
+      { field: 'tempoCura', title: 'Tempo de cura' }
     ];
     const tractionFields = [
       { field: 'tracao14', title: '14 dias' },
@@ -1143,8 +1174,8 @@
           <td>${escapeHtml(formatDateBR(sheet?.productionDate) || '-')}</td>
           <td>${renderMetricCards(pdf, strengthFields, checkMap, 'Não lido no PDF')}</td>
           <td>${renderMetricCards(sheet, strengthFields, checkMap, 'Não lido na planilha')}</td>
-          <td>${renderMetricCards(pdf, cureFields, checkMap, 'Não lido no PDF')}</td>
-          <td>${renderMetricCards(sheet, cureFields, checkMap, 'Não lido na planilha')}</td>
+          <td>${renderMetricCards(pdf, pdfCureFields, checkMap, 'Não lido no PDF')}</td>
+          <td>${renderMetricCards(sheet, sheetCureFields, checkMap, 'Não lido na planilha')}</td>
           <td>${renderMetricCards(pdf, tractionFields, checkMap, 'Não lido no PDF')}</td>
           <td>${renderMetricCards(sheet, tractionFields, checkMap, 'Não lido na planilha')}</td>
           <td class="small">${escapeHtml(diverging)}</td>

@@ -123,3 +123,13 @@ A tolerância numérica padrão é `0,05`, mas pode ser ajustada na tela. Para t
 ## Aparência visual
 
 Esta versão usa o mesmo padrão visual do Hub de Qualidade: tema escuro/claro, cartão principal com marca Rumo, gradientes em azul institucional, botão amarelo de ação e link de retorno para a página principal.
+
+
+## Regra de temperatura
+
+A temperatura não é comparada com a planilha, pois a planilha pode não conter esse dado. O site valida a temperatura diretamente pelo Data Book:
+
+- temperatura máxima do lote deve ser menor ou igual a 60 ºC;
+- variação máxima normalizada por hora deve ser menor ou igual a 20 ºC/h.
+
+Esses limites aparecem na aba **Leitura lado a lado** e também entram como validação do lote quando o Data Book traz leituras de temperatura.
