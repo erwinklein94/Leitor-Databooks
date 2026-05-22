@@ -1,271 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Comparador de Data Books CAVAN em PDF com planilha de controle de qualidade RUMO." />
-  <title>Comparador Data Book CAVAN x Controle RUMO</title>
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem("hq-theme") === "light") {
-          document.documentElement.setAttribute("data-theme", "light");
-        }
-      } catch (error) {}
-    })();
-  </script>
-  <link rel="stylesheet" href="assets/styles.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-  <script src="assets/app.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Cruzamento automático entre o databook de produção da Cavan e a planilha de controle de qualidade da Rumo." />
+<title>Cruzamento Databook x Planilha — DM de Concreto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">Tema claro</button>
-
-  <div class="app-shell">
-    <header class="hero">
-      <nav class="top-actions" aria-label="Navegação superior">
-        <a class="back-link" href="../">← Voltar para a página principal</a>
-      </nav>
-
-      <div class="hero__content">
-        <div class="brand-badge" aria-label="Rumo Logística">
-          <img src="https://logospng.org/download/rumo-logistica/logo-rumo-logistica-1024.png" alt="Rumo Logística" />
-        </div>
-
-        <p class="eyebrow">CAVAN / RUMO</p>
-        <h1>Comparador automático de lotes de dormentes</h1>
-        <p class="hero__text">
-          Cruze os Data Books em PDF com a planilha de controle de qualidade e veja, por lote,
-          o que está igual, parcialmente divergente ou ruim.
-        </p>
-        <div class="hero__badges" aria-label="Características do painel">
-          <span>100% no navegador</span>
-          <span>Pronto para GitHub Pages</span>
-          <span>Exporta CSV e JSON</span>
-        </div>
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div class="brand-txt">
+        <b>Controle de Qualidade — DM de Concreto</b>
+        <span>Cruzamento Databook Cavan × Planilha Rumo</span>
       </div>
-    </header>
+    </div>
+    <div class="topbar-spacer"></div>
+    <span class="proj-pill" id="projPill" style="display:none"><span class="dot"></span><span id="projPillTxt">—</span></span>
+  </div>
+</div>
 
-    <main class="container">
-      <section class="panel grid-2" aria-labelledby="entrada-title">
-        <div>
-          <p class="section-kicker">1. Arquivos</p>
-          <h2 id="entrada-title">Carregue os documentos</h2>
-          <p class="muted">
-            Os arquivos são processados localmente. Nada é enviado para servidor.
-          </p>
-        </div>
-        <div class="upload-area">
-          <label class="upload-card">
-            <span class="upload-card__title">Data Books CAVAN em PDF</span>
-            <span class="upload-card__hint">Aceita um ou vários PDFs: FMT, Ferronorte, MP Mista, MP Larga etc.</span>
-            <input id="pdfFiles" type="file" accept="application/pdf,.pdf" multiple />
-          </label>
-          <label class="upload-card">
-            <span class="upload-card__title">Planilha RUMO em XLSX</span>
-            <span class="upload-card__hint">Planilha de controle de fabricação dos dormentes.</span>
-            <input id="xlsxFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
-          </label>
-        </div>
-      </section>
-
-      <section class="panel" aria-labelledby="config-title">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">2. Configuração</p>
-            <h2 id="config-title">Escolha o projeto e os critérios</h2>
-          </div>
-          <button id="analyzeBtn" class="button button-primary">Comparar lotes</button>
-        </div>
-
-        <div class="controls">
-          <label>
-            Projeto
-            <select id="projectFilter">
-              <option value="TODOS">Todos os projetos detectados</option>
-              <option value="FMT">FMT</option>
-              <option value="FERRONORTE">FERRONORTE</option>
-              <option value="MISTA_MP">MALHA PAULISTA - BITOLA MISTA</option>
-              <option value="LARGA_MP">MALHA PAULISTA - BITOLA LARGA</option>
-            </select>
-          </label>
-          <label>
-            Tolerância numérica
-            <input id="tolerance" type="number" min="0" max="10" step="0.01" value="0.05" />
-            <span class="field-hint">Diferença máxima aceita em MPa, kN ou valores decimais.</span>
-          </label>
-          <label>
-            Linha de cabeçalho da planilha
-            <select id="headerMode">
-              <option value="auto">Detectar automaticamente</option>
-              <option value="3">Usar linha 3</option>
-              <option value="4">Usar linha 4</option>
-              <option value="1">Usar linha 1</option>
-            </select>
-          </label>
-        </div>
-
-        <details class="details-box">
-          <summary>Campos comparados nesta versão</summary>
-          <p class="muted">
-            A comparação usa o Data Book como base: lotes que aparecem apenas na planilha são ignorados;
-            lotes que aparecem no Data Book e não aparecem na planilha são marcados como erro.
-          </p>
-          <div class="tag-list">
-            <span>Lote</span><span>Projeto</span><span>Data de produção</span><span>Lote de ombreiras/chumbadores</span>
-            <span>Compressão axial 7 dias</span><span>Compressão axial 14 dias</span><span>Tração 14 dias</span>
-            <span>Compressão axial 28 dias</span><span>Tração 28 dias</span><span>Tempo de cura</span>
-            <span>Temperatura máxima</span><span>Variação máxima por hora</span><span>Desprotensão/transferência</span>
-            <span>Status e motivo da planilha</span><span>Status A/R do PDF</span>
-          </div>
-        </details>
-      </section>
-
-      <section id="statusPanel" class="status-panel" aria-live="polite"></section>
-
-      <section id="resultsSection" class="panel hidden" aria-labelledby="resultado-title">
-        <div class="panel-heading panel-heading--wrap">
-          <div>
-            <p class="section-kicker">3. Resultado</p>
-            <h2 id="resultado-title">Classificação dos lotes</h2>
-          </div>
-          <div class="button-row">
-            <button id="exportCsvBtn" class="button">Exportar CSV</button>
-            <button id="exportJsonBtn" class="button">Exportar JSON</button>
-            <button id="clearBtn" class="button button-ghost">Limpar resultado</button>
-          </div>
-        </div>
-
-        <div id="summaryCards" class="summary-grid"></div>
-
-        <div class="tab-bar" role="tablist" aria-label="Abas do resultado">
-          <button class="tab-button active" type="button" data-tab="classification" role="tab" aria-selected="true">Classificação</button>
-          <button class="tab-button" type="button" data-tab="readback" role="tab" aria-selected="false">Leitura lado a lado</button>
-        </div>
-
-        <div id="classificationPanel" class="tab-panel">
-          <div class="filters-row">
-            <label>
-              Filtrar resultado
-              <input id="searchInput" type="search" placeholder="Digite lote, projeto, status ou divergência..." />
-            </label>
-            <label>
-              Mostrar
-              <select id="statusFilter">
-                <option value="TODOS">Todos</option>
-                <option value="OK">OK</option>
-                <option value="PARCIAL">Parcialmente bons</option>
-                <option value="RUIM">Ruins</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="table-wrap">
-            <table id="resultTable">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Projeto</th>
-                  <th>Status</th>
-                  <th>Acerto</th>
-                  <th>Campos OK</th>
-                  <th>Divergências</th>
-                  <th>Página PDF</th>
-                  <th>Linha planilha</th>
-                  <th>Detalhe</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-
-          <div id="detailPanel" class="detail-panel hidden"></div>
-        </div>
-
-        <div id="readbackPanel" class="tab-panel hidden">
-          <div class="readback-intro">
-            <h3>Leitura extraída do PDF e da planilha</h3>
-            <p class="muted">
-              Esta aba mostra, lote a lote, exatamente o que o leitor conseguiu capturar nas duas fontes.
-              O percentual de leitura considera lote, tipo, data, tempo de cura, compressão axial e tração na flexão.
-              Temperatura não entra no percentual contra a planilha; ela é validada apenas no Data Book contra os limites de 60 ºC e 20 ºC/h.
-            </p>
-          </div>
-          <div class="table-wrap table-wrap--wide">
-            <table id="readbackTable" class="readback-table">
-              <thead>
-                <tr>
-                  <th>Lote / Projeto</th>
-                  <th>Status / % leitura</th>
-                  <th>Tipo PDF</th>
-                  <th>Tipo Planilha</th>
-                  <th>Data PDF</th>
-                  <th>Data Planilha</th>
-                  <th>Compressão axial PDF</th>
-                  <th>Compressão axial Planilha</th>
-                  <th>Tempo cura / Temperatura PDF</th>
-                  <th>Tempo cura Planilha</th>
-                  <th>Tração PDF</th>
-                  <th>Tração Planilha</th>
-                  <th>Divergências desta aba</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section id="diagnosticsSection" class="panel hidden" aria-labelledby="diagnostico-title">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">4. Diagnóstico</p>
-            <h2 id="diagnostico-title">O que o leitor conseguiu extrair</h2>
-          </div>
-        </div>
-        <div id="diagnostics" class="diagnostics-grid"></div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <p>
-        Controle de qualidade • Coordenação Engenharia de Qualidade &amp; Homologação de Materiais de Via.
-        Ferramenta estática para conferência operacional; divergências e campos ausentes devem ser revisados pela equipe responsável.
-      </p>
-    </footer>
+<div class="wrap">
+  <!-- HERO + SETUP -->
+  <div class="hero">
+    <span class="kicker"><span class="blip"></span>Conferência automática de lotes</span>
+    <h1 class="title">Cruze o <em>databook</em> com a planilha em segundos.</h1>
+    <p class="subtitle">Suba o databook (PDF) da Cavan e a planilha de controle da Rumo. O site lê os dois, casa lote a lote e aponta o que está conforme, parcial ou divergente — tudo no seu navegador, sem enviar nada para servidor.</p>
   </div>
 
-  <script>
-    (function () {
-      var key = "hq-theme";
-      var button = document.getElementById("themeToggle");
+  <div class="setup">
+    <div class="setup-head">
+      <h2>1. Carregar arquivos</h2>
+      <p>Escolha o projeto e suba os dois documentos do mesmo período.</p>
+    </div>
+    <div class="setup-body">
+      <div class="field">
+        <label>Projeto</label>
+        <div class="select-wrap">
+          <select id="projSel">
+            <option value="FMT">FMT — Bitola larga</option>
+            <option value="FERRONORTE">Ferronorte</option>
+            <option value="MP_MISTA">Malha Paulista — bitola mista</option>
+            <option value="MP_LARGA">Malha Paulista — bitola larga</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Databook (PDF) — Cavan</label>
+        <div class="drop" id="dropPdf">
+          <div class="drop-ic" id="icPdf">PDF</div>
+          <div class="drop-tx"><b id="pdfName">Selecionar ou arrastar</b><span id="pdfSub">Certificados de qualidade do lote</span></div>
+        </div>
+        <input type="file" id="filePdf" accept="application/pdf" hidden />
+      </div>
+      <div class="field">
+        <label>Planilha (XLSX) — Rumo</label>
+        <div class="drop" id="dropXls">
+          <div class="drop-ic" id="icXls">XLS</div>
+          <div class="drop-tx"><b id="xlsName">Selecionar ou arrastar</b><span id="xlsSub">Controle de fabricação</span></div>
+        </div>
+        <input type="file" id="fileXls" accept=".xlsx,.xls" hidden />
+      </div>
+    </div>
+    <div class="setup-foot">
+      <button class="btn btn-primary" id="runBtn" disabled>Cruzar dados →</button>
+      <button class="btn btn-ghost" id="resetBtn" style="display:none">Limpar</button>
+      <div class="status-line" id="statusLine"><span class="spin"></span><span id="statusTxt">Aguardando os dois arquivos.</span></div>
+    </div>
+  </div>
 
-      function applyTheme(theme) {
-        var isLight = theme === "light";
-        if (isLight) {
-          document.documentElement.setAttribute("data-theme", "light");
-        } else {
-          document.documentElement.removeAttribute("data-theme");
-        }
-        if (button) {
-          button.textContent = isLight ? "Tema escuro" : "Tema claro";
-          button.setAttribute("aria-pressed", isLight ? "true" : "false");
-          button.setAttribute("aria-label", isLight ? "Mudar para tema escuro" : "Mudar para tema claro");
-        }
-      }
+  <!-- TABS -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="cmp">Comparação lado a lado <span class="badge" id="cmpBadge">0</span></button>
+    <button class="tab" data-tab="lots">Lotes <span class="badge" id="lotsBadge">0</span></button>
+  </div>
 
-      var current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
-      applyTheme(current);
+  <!-- DASHBOARD -->
+  <div class="panel active" id="panel-dash"></div>
+  <!-- COMPARISON -->
+  <div class="panel" id="panel-cmp"></div>
+  <!-- LOTS -->
+  <div class="panel" id="panel-lots"></div>
 
-      if (button) {
-        button.addEventListener("click", function () {
-          var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
-          try { localStorage.setItem(key, next); } catch (error) {}
-          applyTheme(next);
-        });
-      }
-    })();
-  </script>
+  <div class="foot">
+    Processamento 100% local no navegador • Nenhum arquivo é enviado a servidores • <b>Rumo</b> · Engenharia de Qualidade
+  </div>
+</div>
+
+<script>
+window.PROJECT_LABELS = {
+  FMT:"FMT — Bitola larga", FERRONORTE:"Ferronorte",
+  MP_MISTA:"Malha Paulista — bitola mista", MP_LARGA:"Malha Paulista — bitola larga"
+};
+</script>
+<script src="app.js"></script>
 </body>
 </html>

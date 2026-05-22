@@ -1,135 +1,61 @@
-# Comparador Data Book CAVAN x Controle RUMO
+# Cruzamento Databook × Planilha — DM de Concreto
 
-Site estático para GitHub Pages que compara lotes de dormentes de concreto entre:
+Site estático que cruza o **databook de produção (PDF) da Cavan** com a **planilha de controle de qualidade (XLSX) da Rumo**, lote a lote, e aponta o que está **conforme**, **parcial** ou **não conforme**, com o percentual de aderência de cada lote.
 
-- Data Books CAVAN em PDF;
-- planilha de controle de fabricação/qualidade da RUMO em XLSX.
+Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona direto no GitHub Pages.
 
-O processamento acontece 100% no navegador. Nenhum arquivo é enviado para servidor.
+## Arquivos
 
-## Como usar
-
-1. Abra o site no navegador.
-2. Selecione um ou mais Data Books em PDF.
-3. Selecione a planilha XLSX de controle.
-4. Escolha o projeto ou mantenha "Todos os projetos detectados".
-5. Clique em **Comparar lotes**.
-6. Use a aba **Classificação** para ver os lotes OK, parciais e ruins.
-7. Use a aba **Leitura lado a lado** para conferir exatamente o que o leitor conseguiu capturar do PDF e da planilha.
-8. Exporte o resultado em CSV ou JSON, se necessário.
-
-## Aba Leitura lado a lado
-
-A aba mostra, para cada lote do Data Book:
-
-- lote e projeto;
-- tipo de dormente lido no PDF e na planilha;
-- data de produção/fabricação;
-- compressão axial em todos os dias capturados pelo leitor;
-- tempo de cura;
-- temperatura máxima encontrada;
-- maior variação por hora calculada a partir das leituras do PDF;
-- maior variação na mesma leitura de temperatura, comparando início/meio/fim quando houver;
-- tração na flexão em todos os dias capturados pelo leitor;
-- percentual de acerto da leitura contra a planilha.
-
-O percentual da aba de leitura considera lote, tipo, data, tempo de cura, compressão axial e tração na flexão. Temperatura entra no percentual quando houver valor nas duas fontes. Quando só o PDF possui temperatura, ela é exibida como informação de auditoria, sem penalizar automaticamente o percentual.
+- `index.html` — estrutura da página (HTML)
+- `styles.css` — aparência (CSS)
+- `app.js` — lógica: leitura do PDF (PDF.js), leitura do XLSX (SheetJS), cruzamento e telas
+- `README.md` — este guia
 
 ## Como publicar no GitHub Pages
 
-1. Crie um repositório no GitHub.
-2. Envie estes arquivos mantendo a estrutura:
+1. Crie um repositório no GitHub (ex.: `cruzamento-databook`).
+2. Suba os arquivos `index.html`, `styles.css` e `app.js` na raiz do repositório (mantendo os três juntos).
+3. No GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
+4. Em **Branch**, escolha `main` e a pasta `/ (root)`. Salve.
+5. Em ~1 minuto o site fica disponível em `https://SEU-USUARIO.github.io/cruzamento-databook/`.
 
-```text
-index.html
-assets/app.js
-assets/styles.css
-README.md
-.nojekyll
-```
+> Pode também colocar dentro de um projeto existente, como uma subpasta (ex.: `Projeto-Hub-Qualidade/cruzamento/`), igual aos outros painéis do hub.
 
-3. No GitHub, acesse **Settings > Pages**.
-4. Em **Build and deployment**, selecione:
-   - Source: `Deploy from a branch`
-   - Branch: `main`
-   - Folder: `/root`
-5. Salve e aguarde o GitHub publicar o link.
+## Como usar
 
-## Dependências externas
+1. Escolha o **projeto** (FMT, Ferronorte, Malha Paulista mista/larga).
+2. Suba o **databook (PDF)** da Cavan e a **planilha (XLSX)** da Rumo do mesmo período.
+3. Clique em **Cruzar dados**.
 
-O site usa CDN para carregar:
+### Abas
 
-- PDF.js, para ler PDFs no navegador;
-- SheetJS/XLSX, para ler arquivos XLSX no navegador.
+- **Dashboard** — totais (conformes / parciais / não conformes / sem registro), aderência média e panorama por lote.
+- **Comparação lado a lado** — para cada lote, PDF × Planilha em: tipo, data de produção, compressão axial (todos os dias), tração na flexão e cura/temperatura (temperatura máxima e variação máxima por hora, extraídas do PDF). Ao final, o **% de aderência** do lote.
+- **Lotes** — tabela com status, aderência e atalho para a comparação.
 
-Se a empresa quiser rodar em ambiente sem internet, baixe essas duas bibliotecas e substitua os links CDN no `index.html` por arquivos locais em `assets/vendor/`.
+## Regras de cruzamento
 
-## Projetos reconhecidos
+- A chave de match é o **número do lote** (o site ignora o zero à esquerda; PDF `02349` = planilha `2349`).
+- Lote que está **na planilha mas não no PDF** → **ignorado** (não é erro), pois a planilha contém todos os projetos.
+- Lote que está **no PDF mas não na planilha** → **sinalizado como erro** ("Sem registro na planilha").
+- O **% de aderência** considera só os campos presentes nas **duas** fontes (compressão, tração, desprotensão↔0,6 dias e data de produção). Temperatura e tempo de cura aparecem como referência e **não** entram no cálculo, porque a planilha registra poucos pontos — assim não geram falso erro.
 
-O leitor tenta detectar automaticamente:
+## Parâmetros ajustáveis
 
-- FMT;
-- FERRONORTE;
-- MALHA PAULISTA - BITOLA MISTA;
-- MALHA PAULISTA - BITOLA LARGA.
+No topo do `app.js`, no objeto `CFG`:
 
-A detecção usa o nome do arquivo, o texto da capa do Data Book e o cabeçalho do certificado do lote.
+| Campo | Padrão | O que faz |
+|---|---|---|
+| `TOL_COMP` | 0,1 MPa | tolerância da compressão axial / desprotensão |
+| `TOL_TRAC` | 0,05 MPa | tolerância da tração na flexão |
+| `TOL_TEMP` | 0,5 °C | tolerância de temperatura |
+| `OK_MIN` | 100 | % mínimo para classificar como **Conforme** |
+| `WARN_MIN` | 60 | % mínimo para **Parcial** (abaixo disso, **Não conforme**) |
 
-## Campos comparados
+## Sobre outros projetos (Ferronorte, Malha Paulista)
 
-A versão compara os principais pontos operacionais:
+A leitura da planilha é genérica (vale para todos os projetos). A leitura do **PDF** foi calibrada no databook do **FMT**. Quando você tiver um databook de outro projeto, basta enviá-lo: se o layout do "Certificado de Qualidade do Lote" for diferente, ajustamos o leitor para reconhecê-lo. O ideal é validar um projeto de cada vez.
 
-- lote;
-- projeto;
-- tipo de dormente de forma compatível;
-- data de produção/fabricação;
-- lote de ombreiras/chumbadores;
-- transferência da protensão/desprotensão, quando legível;
-- tempo de cura;
-- temperatura máxima e variações calculadas, quando legíveis;
-- compressão axial aos 7, 14 e 28 dias;
-- tração na flexão aos 14 e 28 dias;
-- status A/R detectado no PDF;
-- status e motivo/observação da planilha.
+---
 
-## Classificação
-
-A comparação usa o Data Book como base da auditoria:
-
-- lotes que aparecem **apenas na planilha** são ignorados, pois podem pertencer a outro Data Book;
-- lotes que aparecem **no Data Book e não aparecem na planilha** são classificados como **RUIM**.
-
-Regras de status:
-
-- **OK**: campos comparados bateram dentro da tolerância.
-- **PARCIAL**: o lote foi encontrado nas duas fontes, mas existe divergência, aviso ou campo ausente.
-- **RUIM**: lote do Data Book não encontrado na planilha, muitas divergências ou divergência crítica forte.
-
-A tolerância numérica padrão é `0,05`, mas pode ser ajustada na tela. Para tempo de cura, a tolerância operacional usada na comparação é de `0,5 hora`.
-
-## Limitações conhecidas
-
-- PDFs escaneados sem texto selecionável não serão lidos corretamente. Eles precisam passar por OCR antes.
-- A leitura do PDF depende da organização textual extraída pelo navegador. O detalhe por lote mostra o texto bruto extraído para auditoria.
-- A ferramenta não substitui a aprovação formal da qualidade. Ela acelera a triagem e mostra onde revisar.
-- Quando a planilha contém mais leituras do que o PDF mostra, a ferramenta aceita os valores do PDF como compatíveis se eles aparecerem na planilha, mas informa essa situação no detalhe.
-
-## Estrutura técnica
-
-- `index.html`: interface principal.
-- `assets/styles.css`: estilo visual responsivo.
-- `assets/app.js`: leitura de PDFs, leitura de XLSX, normalização, comparação, classificação, aba lado a lado e exportação.
-
-## Aparência visual
-
-Esta versão usa o mesmo padrão visual do Hub de Qualidade: tema escuro/claro, cartão principal com marca Rumo, gradientes em azul institucional, botão amarelo de ação e link de retorno para a página principal.
-
-
-## Regra de temperatura
-
-A temperatura não é comparada com a planilha, pois a planilha pode não conter esse dado. O site valida a temperatura diretamente pelo Data Book:
-
-- temperatura máxima do lote deve ser menor ou igual a 60 ºC;
-- variação máxima normalizada por hora deve ser menor ou igual a 20 ºC/h.
-
-Esses limites aparecem na aba **Leitura lado a lado** e também entram como validação do lote quando o Data Book traz leituras de temperatura.
+Processamento 100% local • Rumo · Engenharia de Qualidade
