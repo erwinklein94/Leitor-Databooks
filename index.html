@@ -3,20 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Cruzamento automático entre o databook de produção e a planilha de controle de qualidade da Rumo." />
+<meta name="description" content="Cruzamento automático entre o databook de produção da Cavan e a planilha de controle de qualidade da Rumo." />
 <title>Cruzamento Databook x Planilha — DM de Concreto</title>
-<script>
-(function(){
-  try{
-    if(localStorage.getItem("hq-theme") === "light"){
-      document.documentElement.setAttribute("data-theme", "light");
-    }
-  }catch(error){}
-})();
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css" />
@@ -25,28 +16,23 @@
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand">
+      <div class="brand-mark">R</div>
       <div class="brand-txt">
         <b>Controle de Qualidade — DM de Concreto</b>
-        <span>Cruzamento Databook × Planilha Rumo</span>
+        <span>Cruzamento Databook Cavan × Planilha Rumo</span>
       </div>
     </div>
     <div class="topbar-spacer"></div>
-    <div class="header-actions">
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema"><span class="sun"></span><span id="themeLabel">Tema claro</span></button>
-      <span class="proj-pill" id="projPill" style="display:none"><span class="dot"></span><span id="projPillTxt">—</span></span>
-    </div>
+    <span class="proj-pill" id="projPill" style="display:none"><span class="dot"></span><span id="projPillTxt">—</span></span>
   </div>
 </div>
 
 <div class="wrap">
   <!-- HERO + SETUP -->
   <div class="hero">
-    <div class="hero-topline">
-      <a class="hub-back" href="https://erwinklein94.github.io/Projeto-Hub-Qualidade/" style="display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 20px;background:#003b70;color:#ffffff;border:1px solid rgba(255,255,255,.14);border-radius:16px;text-decoration:none;font-weight:900;font-size:1rem;line-height:1;letter-spacing:-0.01em;box-shadow:0 8px 18px rgba(0,22,45,.16);white-space:nowrap;">← Voltar para a página principal</a>
-    </div>
     <span class="kicker"><span class="blip"></span>Conferência automática de lotes</span>
     <h1 class="title">Cruze o <em>databook</em> com a planilha em segundos.</h1>
-    <p class="subtitle">Suba o databook (PDF) e a planilha de controle da Rumo. O site lê os dois, casa lote a lote e aponta o que está conforme, parcial ou divergente — tudo no seu navegador, sem enviar nada para servidor.</p>
+    <p class="subtitle">Suba o databook (PDF) da Cavan e a planilha de controle da Rumo. O site lê os dois, casa lote a lote e aponta o que está conforme, parcial ou divergente — tudo no seu navegador, sem enviar nada para servidor.</p>
   </div>
 
   <div class="setup">
@@ -67,7 +53,7 @@
         </div>
       </div>
       <div class="field">
-        <label>Databook (PDF)</label>
+        <label>Databook (PDF) — Cavan</label>
         <div class="drop" id="dropPdf">
           <div class="drop-ic" id="icPdf">PDF</div>
           <div class="drop-tx"><b id="pdfName">Selecionar ou arrastar</b><span id="pdfSub">Certificados de qualidade do lote</span></div>
@@ -116,29 +102,5 @@ window.PROJECT_LABELS = {
 };
 </script>
 <script src="app.js"></script>
-<script>
-(function(){
-  const btn = document.getElementById("themeToggle");
-  const label = document.getElementById("themeLabel");
-  if(!btn || !label) return;
-  const sync = () => {
-    const isLight = document.documentElement.getAttribute("data-theme") === "light";
-    label.textContent = isLight ? "Tema escuro" : "Tema claro";
-    btn.setAttribute("aria-pressed", String(isLight));
-  };
-  btn.addEventListener("click", () => {
-    const isLight = document.documentElement.getAttribute("data-theme") === "light";
-    if(isLight){
-      document.documentElement.removeAttribute("data-theme");
-      try{ localStorage.removeItem("hq-theme"); }catch(error){}
-    }else{
-      document.documentElement.setAttribute("data-theme", "light");
-      try{ localStorage.setItem("hq-theme", "light"); }catch(error){}
-    }
-    sync();
-  });
-  sync();
-})();
-</script>
 </body>
 </html>

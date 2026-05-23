@@ -1,6 +1,6 @@
 # Cruzamento Databook × Planilha — DM de Concreto
 
-Site estático que cruza o **databook de produção (PDF)** com a **planilha de controle de qualidade (XLSX) da Rumo**, lote a lote, e aponta o que está **conforme**, **parcial** ou **não conforme**, com o percentual de aderência de cada lote.
+Site estático que cruza o **databook de produção (PDF) da Cavan** com a **planilha de controle de qualidade (XLSX) da Rumo**, lote a lote, e aponta o que está **conforme**, **parcial** ou **não conforme**, com o percentual de aderência de cada lote.
 
 Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona direto no GitHub Pages.
 
@@ -24,7 +24,7 @@ Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona 
 ## Como usar
 
 1. Escolha o **projeto** (FMT, Ferronorte, Malha Paulista mista/larga).
-2. Suba o **databook (PDF)** e a **planilha (XLSX)** da Rumo do mesmo período.
+2. Suba o **databook (PDF)** da Cavan e a **planilha (XLSX)** da Rumo do mesmo período.
 3. Clique em **Cruzar dados**.
 
 ### Abas
@@ -55,13 +55,28 @@ No topo do `app.js`, no objeto `CFG`:
 ## Projetos suportados pelo leitor de PDF
 
 - **FMT — bitola larga** (1º dia de cura tipicamente "0,6 dias")
+- **Ferronorte — bitola larga** (tipo "Bitola larga"; desprotensão variável, incluindo valores ≥ 1 dia como "1,6 dias"; tolera valores de resistência sem casa decimal, ex.: "81")
 - **Malha Paulista — bitola mista** (tipo "Bitola mista"; 1º dia de cura varia por lote: 0,5 / 0,6 / 0,7 / 0,8 dias — o leitor reconhece qualquer fração e a casa com a desprotensão da planilha)
+- **Malha Paulista — bitola larga** (tipo "Bitola larga"; mesmo formulário, 1º dia variável 0,5/0,6)
 
 O leitor também tolera lotes em que a coluna "Fim" da tabela de temperatura está vazia.
 
-## Sobre outros projetos (Ferronorte, Malha Paulista bitola larga)
+### Como o site distingue FMT de Malha Paulista larga
 
-A leitura da planilha é genérica (vale para todos os projetos). A leitura do **PDF** foi calibrada no databook do **FMT**. Quando você tiver um databook de outro projeto, basta enviá-lo: se o layout do "Certificado de Qualidade do Lote" for diferente, ajustamos o leitor para reconhecê-lo. O ideal é validar um projeto de cada vez.
+Ambos são "bitola larga", então a separação não é pela bitola e sim pela combinação **projeto + tipo** na planilha: FMT tem projeto "FMT" (tipo "Bitola Larga FMT USP"); a Malha Paulista larga tem projeto "MALHA PAULISTA" com tipo iniciando em "Bitola Larga MP" (inclusive variações como "C.T reto", "C.T curvo", "TR-68", "UIC-60"). A diferença textual no tipo de dormente (ex.: "Bitola larga" no databook vs "Bitola Larga MP C.T reto" na planilha) é tratada como **compatível** e não conta como erro.
+
+### Ferronorte — bitola larga (validado)
+
+O databook do **Ferronorte** (DB 004/26 — Cavan Santa Lúcia, janeiro/2026, 14 lotes) foi lido e conferido lote a lote. O layout do "Certificado de Qualidade do Lote" é o mesmo formulário FQA 014.32, então o leitor reconhece os 14 certificados sem mudança de estrutura. Dois ajustes foram necessários para tratar variações que não apareciam no FMT:
+
+1. **Tempo de desprotensão maior que 1 dia.** No FMT/MP a 1ª linha de cura era sempre uma fração (0,5 / 0,6 / 0,7 / 0,8 dias). O Ferronorte trouxe lotes com desprotensão em **"1,6 dias"** (lote 02482). O leitor agora trata como desprotensão **qualquer** linha "X dias" cujo X não seja exatamente 7, 14 ou 28 — frações ou valores ≥ 1 dia.
+2. **Valor de resistência sem casa decimal.** Algumas células vinham como inteiro (ex.: compressão "81" em vez de "81,00", lote 02419). O leitor antes exigia vírgula decimal e desalinhava a linha; agora aceita inteiros e decimais na mesma captura.
+
+Ambos os ajustes são generalizações: tudo que o FMT e a Malha Paulista já liam continua igual.
+
+## Sobre outros projetos
+
+A leitura da planilha é genérica (vale para todos os projetos). A leitura do **PDF** foi calibrada no FMT e validada também no Ferronorte e na Malha Paulista. Quando você tiver um databook de um projeto novo, basta enviá-lo: se o layout do "Certificado de Qualidade do Lote" for diferente, ajustamos o leitor para reconhecê-lo. O ideal é validar um projeto de cada vez.
 
 ---
 

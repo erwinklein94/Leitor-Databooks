@@ -1,5 +1,5 @@
 /* =====================================================================
-   Cruzamento Databook (PDF) × Planilha (XLSX Rumo)
+   Cruzamento Databook (PDF Cavan) × Planilha (XLSX Rumo)
    Tudo roda no navegador. Sem backend.
    ===================================================================== */
 
@@ -83,18 +83,22 @@ function parseCertPage(items, pageNum){
   const data = (allText.match(/DATA DE PRODU[ÇC][ÃA]O:\s*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i)||[])[1] || null;
 
   // ----- Compressão axial e tração -----
-  // O 1º dia de cura é uma fração (0,5 / 0,6 / 0,7 / 0,8 ... varia por lote/projeto)
-  // e corresponde à desprotensão. Os demais são 7, 14 e 28 dias.
+  // A 1ª linha de cura é a DESPROTENSÃO (transferência da protensão). O tempo
+  // varia por lote/projeto: FMT/MP usam frações 0,5/0,6/0,7/0,8; o Ferronorte
+  // pode trazer valores >= 1 dia (ex.: "1,6 dias"). Tratamos como desprotensão
+  // qualquer linha "X dias" cujo X NÃO seja exatamente 7, 14 ou 28.
+  // Os valores das bobinas podem vir com vírgula decimal (75,99) OU inteiros
+  // (ex.: "81"), então a captura aceita as duas formas.
   const comp = {}, trac = {};
-  let primeiroDia = null; // ex.: "0,5" — guarda qual fração o lote usou
+  let primeiroDia = null; // ex.: "0,5" ou "1,6" — guarda o tempo de desprotensão do lote
   for (const ln of lines){
-    const m = ln.match(/^\s*(0[.,]\d|7|14|28)\s*dias\s+(.*)$/i);
+    const m = ln.match(/^\s*(\d{1,2}(?:[.,]\d{1,2})?)\s*dias\s+(.*)$/i);
     if (m){
-      const dia = m[1].replace(".",",");
-      const isFrac = /^0,/.test(dia);
-      const key = isFrac ? "frac" : dia;          // unifica qualquer fração em "frac"
-      if (isFrac) primeiroDia = dia;
-      const nums = (m[2].match(/\d{1,3},\d{1,2}/g)||[]).map(x=>parseFloat(x.replace(",",".")));
+      const diaNum = parseFloat(m[1].replace(",","."));
+      const isFixo = (diaNum===7 || diaNum===14 || diaNum===28);
+      const key = isFixo ? String(diaNum) : "frac"; // qualquer não-7/14/28 = desprotensão
+      if (!isFixo) primeiroDia = m[1].replace(".",",");
+      const nums = (m[2].match(/\d{1,3}(?:,\d{1,2})?/g)||[]).map(x=>parseFloat(x.replace(",",".")));
       if (nums.length>=2) comp[key]=[nums[0],nums[1]];
       if (nums.length>=4) trac[key]=[nums[2],nums[3]];
     }
