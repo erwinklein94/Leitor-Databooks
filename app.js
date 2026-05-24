@@ -32,7 +32,8 @@ function toNum(s){
 }
 function parsePair(s){
   if (s === null || s === undefined) return [];
-  const m = String(s).match(/\d{1,3}[.,]\d{1,2}/g);
+  // aceita 1 a 3 casas decimais (a planilha pode trazer "37,30" ou "37,300")
+  const m = String(s).match(/\d{1,3}[.,]\d{1,3}/g);
   return m ? m.map(x=>parseFloat(x.replace(",","."))) : [];
 }
 function fmt(v, dec=2){
@@ -87,8 +88,13 @@ function parseCertPage(items, pageNum){
   // varia por lote/projeto: FMT/MP usam frações 0,5/0,6/0,7/0,8; o Ferronorte
   // pode trazer valores >= 1 dia (ex.: "1,6 dias"). Tratamos como desprotensão
   // qualquer linha "X dias" cujo X NÃO seja exatamente 7, 14 ou 28.
-  // Os valores das bobinas podem vir com vírgula decimal (75,99) OU inteiros
-  // (ex.: "81"), então a captura aceita as duas formas.
+  // Os valores das bobinas podem vir com vírgula decimal de 1 a 3 casas
+  // (ex.: "75,99" no FMT antigo; "37,300" / "39,120" / "35,500" nos databooks
+  // de jul/ago 2025 da Cavan Santa Lúcia) OU como inteiros (ex.: "81" no
+  // Ferronorte). A captura aceita todas as formas: ponto OU vírgula como
+  // separador e de 0 a 3 casas decimais. Atenção: limitar a captura a 2 casas
+  // quebrava os databooks de 3 casas — "37,300" virava "37,30" + "0", zerando
+  // a 2ª bobina e criando valores de tração fantasmas.
   const comp = {}, trac = {};
   let primeiroDia = null; // ex.: "0,5" ou "1,6" — guarda o tempo de desprotensão do lote
   for (const ln of lines){
@@ -98,9 +104,19 @@ function parseCertPage(items, pageNum){
       const isFixo = (diaNum===7 || diaNum===14 || diaNum===28);
       const key = isFixo ? String(diaNum) : "frac"; // qualquer não-7/14/28 = desprotensão
       if (!isFixo) primeiroDia = m[1].replace(".",",");
-      const nums = (m[2].match(/\d{1,3}(?:,\d{1,2})?/g)||[]).map(x=>parseFloat(x.replace(",",".")));
-      if (nums.length>=2) comp[key]=[nums[0],nums[1]];
-      if (nums.length>=4) trac[key]=[nums[2],nums[3]];
+      const nums = (m[2].match(/\d{1,3}(?:[.,]\d{1,3})?/g)||[]).map(x=>parseFloat(x.replace(",",".")));
+      if (isFixo){
+        // 7/14/28 dias: sempre 2 corpos de prova de compressão; tração (14/28)
+        // vem nas 2 colunas seguintes, quando presente.
+        if (nums.length>=2) comp[key]=[nums[0],nums[1]];
+        if (nums.length>=4) trac[key]=[nums[2],nums[3]];
+      } else {
+        // DESPROTENSÃO: o nº de corpos de prova varia por projeto. FMT e Malha
+        // Paulista rompem 2; o Ferronorte (DB 023/25, ago/2025) rompe só 1
+        // (ex.: "0,6 dias 25,290"). A tração só começa aos 14 dias, então
+        // todos os valores desta linha são compressão (1 a 3 corpos).
+        if (nums.length>=1) comp[key]=nums.slice(0,3);
+      }
     }
   }
 
@@ -176,6 +192,11 @@ const COL = { // 0-based, conforme cabeçalho na linha 3
 // normaliza o nome do projeto da planilha para a chave do seletor
 function normProject(raw){
   const s = (raw||"").toString().toUpperCase().replace(/\s+/g," ").trim();
+  // Contratrilho (DB 030/25): projeto próprio, bitola larga. A grafia na
+  // planilha ainda não foi confirmada, então reconhecemos as variações comuns
+  // ("CONTRATRILHO", "CONTRATILHO", "CONTRA TRILHO"). Vem antes da Malha
+  // Paulista para não ser confundido por outras regras.
+  if (/CONTRA ?TR?ILHO/.test(s)) return "CONTRATILHO";
   if (s.includes("FMT")) return "FMT";
   if (s.includes("FERRO")) return "FERRONORTE";
   if (s.includes("MALHA PAULISTA") || s.includes("MP")) return "MP"; // bitola definida pelo tipo

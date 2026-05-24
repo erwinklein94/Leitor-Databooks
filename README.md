@@ -74,6 +74,62 @@ O databook do **Ferronorte** (DB 004/26 — Cavan Santa Lúcia, janeiro/2026, 14
 
 Ambos os ajustes são generalizações: tudo que o FMT e a Malha Paulista já liam continua igual.
 
+### Databooks Cavan Santa Lúcia — julho/agosto 2025 (validado)
+
+Foram conferidos lote a lote mais três databooks no mesmo formulário FQA 014.32, somando **115 certificados** lidos sem nenhuma pendência:
+
+- **DB 019/25 — FMT, julho/2025** (52 lotes, tipo "Bitola larga - FMT")
+- **DB 020/25 — Malha Paulista, julho/2025** (13 lotes, tipo "Bitola larga")
+- **DB 021/25 — FMT, agosto/2025** (50 lotes, tipo "Bitola larga - FMT"; inclui lote com desprotensão em "1,6 dias")
+
+Um único ajuste foi necessário para tratá-los:
+
+### Databooks Cavan Santa Lúcia — agosto/setembro 2025 (validado)
+
+Mais três databooks no mesmo formulário FQA 014.32 foram conferidos lote a lote, somando **40 certificados** lidos sem nenhuma pendência:
+
+- **DB 022/25 — Malha Paulista, agosto/2025** (10 lotes, tipo "Bitola larga")
+- **DB 023/25 — Ferronorte, agosto/2025** (18 lotes, tipo "Bitola larga"; cliente "RUMO - FERRONORTE")
+- **DB 024/25 — Malha Paulista BL, setembro/2025** (12 lotes, tipo "Bitola larga")
+
+### Databooks Cavan Santa Lúcia — setembro 2025, 2ª leva (validado, sem ajuste)
+
+Mais três databooks foram conferidos lote a lote, somando **57 certificados** lidos sem nenhuma pendência — e desta vez **nenhum ajuste no leitor foi necessário**, pois as generalizações anteriores (3 casas decimais e desprotensão de 1 a 3 corpos de prova) já cobriam todas as variações:
+
+- **DB 025/25 — Ferronorte, setembro/2025** (26 lotes, tipo "Bitola larga"; desprotensão de 1 corpo, como o DB 023)
+- **DB 026/25 — FMT, setembro/2025** (24 lotes, tipo "Bitola larga - FMT")
+- **DB 027/25 — Malha Paulista BM, setembro/2025** (7 lotes, tipo **"Bitola mista"**; já reconhecido pelo leitor, casado com `MP_MISTA` na planilha)
+
+Com isso, o leitor está validado lote a lote em **9 databooks / 212 certificados** (FMT jul/ago/set, Malha Paulista larga jul/ago/set, Malha Paulista mista set e Ferronorte ago/set), todos no formulário FQA 014.32, sem nenhuma pendência de leitura.
+
+### Databooks Cavan Santa Lúcia — outubro/novembro 2025 (validado; novo projeto Contratrilho)
+
+Mais três databooks foram conferidos lote a lote, somando **81 certificados** lidos sem nenhuma pendência. O leitor de PDF **não precisou de ajuste** — as generalizações anteriores já cobriam tudo:
+
+- **DB 028/25 — Mista, outubro/2025** (39 lotes, tipo "Bitola mista")
+- **DB 029/25 — Ferronorte, outubro/2025** (25 lotes, tipo "Bitola larga"; desprotensão de 1 corpo)
+- **DB 030/25 — Contratrilho BL, outubro–novembro/2025** (17 lotes, tipo "Bitola larga"; desprotensão de 2 corpos, valores em 3 casas decimais; referência "≥ 30,0 MPa")
+
+O DB 030 trouxe um **projeto novo**: o **Contratrilho** (dormente de bitola larga para trecho de contratrilho). No certificado, o tipo é apenas "Bitola larga" e a leitura dos ensaios é idêntica aos demais. Como é um projeto próprio, foram adicionados:
+
+- uma opção **"Contratrilho — bitola larga"** no seletor (`index.html`), com a chave `CONTRATILHO`;
+- o reconhecimento no `normProject` (`app.js`), tolerando as grafias **"CONTRATRILHO", "CONTRATILHO"** e **"CONTRA TRILHO"** que a planilha possa usar (a grafia exata da coluna *Projeto* da Rumo para esse contrato ainda não foi confirmada — quando você enviar uma planilha de Contratrilho, conferimos e ajustamos se preciso).
+
+Resumo geral: leitor validado em **12 databooks / 293 certificados**, cobrindo FMT, Malha Paulista (larga e mista), Ferronorte e Contratrilho.
+
+### Databooks Cavan Santa Lúcia — out/nov a jan (validado, sem ajuste)
+
+Mais quatro databooks foram conferidos lote a lote, somando **63 certificados** lidos sem nenhuma pendência. O leitor **não precisou de ajuste** (tipos e formatos já cobertos):
+
+- **DB 031/25 — Malha Paulista bitola larga, out–nov/2025** (17 lotes, tipo "Bitola larga")
+- **DB 033/25 — Ferronorte, dezembro/2025** (15 lotes, tipo "Bitola larga"; desprotensão de 1 corpo)
+- **DB 034/25 — Mista, dezembro/2025** (28 lotes, tipo "Bitola mista")
+- **DB 035/25 — Mista, janeiro** (3 lotes, tipo "Bitola mista"; lotes de 4 dígitos sem zero à esquerda, ex.: "1379" — o cruzamento já normaliza isso)
+
+Duas observações de **origem** (não são erro de leitura): o DB 035 traz lotes numerados sem o zero à esquerda — o cruzamento usa o número sem zeros à esquerda, então casa normalmente com a planilha. E o DB 031 (MP larga) repete os mesmos lotes/valores do DB 030 (Contratrilho); o leitor lê os dois fielmente, mas vale conferir na origem se há sobreposição ou rotulagem trocada entre esses arquivos.
+
+Resumo geral atualizado: leitor validado em **16 databooks / 356 certificados**, cobrindo FMT, Malha Paulista (larga e mista), Ferronorte e Contratrilho.
+
 ## Sobre outros projetos
 
 A leitura da planilha é genérica (vale para todos os projetos). A leitura do **PDF** foi calibrada no FMT e validada também no Ferronorte e na Malha Paulista. Quando você tiver um databook de um projeto novo, basta enviá-lo: se o layout do "Certificado de Qualidade do Lote" for diferente, ajustamos o leitor para reconhecê-lo. O ideal é validar um projeto de cada vez.
