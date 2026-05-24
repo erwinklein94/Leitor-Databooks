@@ -47,7 +47,6 @@ async function parsePDF(file, statusCb){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
   const lots = [];
-  const chumbadores = []; // certificados de fixações (chumbadores/ombreiras) — nível databook
   for (let p=1; p<=pdf.numPages; p++){
     if (p%10===0 && statusCb) statusCb(`Lendo databook… página ${p}/${pdf.numPages}`);
     const page = await pdf.getPage(p);
@@ -58,122 +57,10 @@ async function parsePDF(file, statusCb){
       y: it.transform[5]
     })).filter(it=>it.str.trim()!=="");
     const flat = items.map(i=>i.str).join(" ");
-
-    // (a) páginas de certificado de qualidade do lote (dormente produzido)
-    if (/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)){
-      lots.push(parseCertPage(items, p));
-      continue;
-    }
-    // (b) páginas da seção 4.3 — certificados de qualidade das FIXAÇÕES (chumbadores).
-    //     Dois formatos de fornecedor já vistos nos databooks da Cavan:
-    //       • HIPPER FREIOS — "Relatório Técnico de Qualidade"; o lote/rastreabilidade
-    //         do chumbador é a CORRIDA ("M___").
-    //       • PANDROL — "Certificado de Qualidade / Quality Certificate"; não há corrida,
-    //         então o lote/rastreabilidade é a NF (nota fiscal) de cada expedição.
-    //     Em ambos não há vínculo lote-a-lote com o dormente — é rastreabilidade do databook.
-    //     Gate: a página cita "OMBREIRA" e NÃO é o certificado do lote do dormente.
-    if (/OMBREIRA/i.test(flat) && !/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat) &&
-        (/Relat[óo]rio T[ée]cnico de Qualidade/i.test(flat) || /QUALITY CERTIFICATE/i.test(flat) ||
-         /CERTIFICADO DE CONFORMIDADE/i.test(flat) || /PANDROL/i.test(flat) || /Rastreabilidade/i.test(flat))){
-      const c = parseChumbadorPage(items, p);
-      if (c && (c.corridas.length || c.certNum || c.notaFiscal)) chumbadores.push(c);
-    }
+    if (!/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)) continue;
+    lots.push(parseCertPage(items, p));
   }
-  return { lots, chumbadores: dedupeChumbadores(chumbadores) };
-}
-
-/* Reconstrói as linhas de uma página a partir das posições (y agrupado) */
-function pageLines(items, tolY){
-  const tol = tolY || 2.6;
-  const rows = []; let curY=null, cur=null;
-  for (const it of [...items].sort((a,b)=> b.y-a.y || a.x-b.x)){
-    if (curY===null || Math.abs(it.y-curY)>tol){ cur={y:it.y,items:[it]}; rows.push(cur); curY=it.y; }
-    else { cur.items.push(it); curY=(curY+it.y)/2; }
-  }
-  return rows.map(r=> r.items.sort((a,b)=>a.x-b.x).map(i=>i.str).join(" ").replace(/\s+/g," ").trim());
-}
-
-/* Lê um laudo de FIXAÇÕES (chumbador/ombreira) da seção 4.3.
-   Reconhece dois formatos:
-   • HIPPER FREIOS ("Relatório Técnico de Qualidade"): nº do certificado, data,
-     descrição, fornecedor, material, quantidade e as CORRIDAS ("M___") — que são
-     o lote/rastreabilidade do chumbador.
-   • PANDROL ("Certificado de Qualidade / Quality Certificate"): pedido, data de
-     expedição e NF de cada expedição. Aqui não há corrida, então a NF é o
-     identificador de lote/rastreabilidade do chumbador. */
-function parseChumbadorPage(items, pageNum){
-  const lines = pageLines(items, 3);
-  const all = lines.join("\n");
-
-  const isPandrol = /QUALITY CERTIFICATE/i.test(all) || /PANDROL/i.test(all) ||
-                    /PEDIDO\s+PANDROL/i.test(all) || /OMBREIRA P\/ ?DORM/i.test(all);
-
-  // ----- Formato PANDROL -----
-  if (isPandrol && !/Relat[óo]rio T[ée]cnico de Qualidade/i.test(all)){
-    // linha do produto: contém "OMBREIRA" e os números QTD SOLICITADA / QTD EXPEDIDA
-    // (números com separador de milhar, ex.: "136.940" e "19.000"). O código do
-    // produto "13156" não tem ponto, então não é confundido com quantidade.
-    const prodLine = lines.find(l=>/OMBREIRA/i.test(l) && /\d{1,3}(?:\.\d{3})+/.test(l)) ||
-                     lines.find(l=>/OMBREIRA/i.test(l)) || "";
-    const qNums = prodLine.match(/\b\d{1,3}(?:\.\d{3})+\b/g) || [];
-    const qtd = qNums.length ? qNums[qNums.length-1] : null;           // QTD EXPEDIDA = última
-    const desc = prodLine.replace(/^\s*\d{4,6}\s+/,"")                  // tira o código do produto
-                         .replace(/\s+\d{1,3}(?:\.\d{3})+.*$/,"").trim() || null;
-    // linha de dados: pedido pandrol | pedido cliente | recebido em | expedição | NF
-    const row  = all.match(/\b(\d{1,3}\.\d{3})\s+(\d{6,12})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2,4}\.\d{3})\b/);
-    const nf      = row ? row[5] : ((all.match(/INVOICE\s*N[ºo°]?[\s\S]{0,140}?\b(\d{2,4}\.\d{3})\b/i)||[])[1] || null);
-    const dataExp = row ? row[4] : ((all.match(/DISPATCH DATE[\s\S]{0,140}?(\d{2}\/\d{2}\/\d{4})/i)||[])[1] || null);
-    const pedido  = row ? row[1] : ((all.match(/PEDIDO\s+PANDROL[\s\S]{0,160}?(\d{1,3}\.\d{3})/i)||[])[1] || null);
-    return { certNum:null, data:dataExp, desc, fornecedor:"PANDROL",
-             material:null, quantidade:qtd?qtd.replace(/\s/g,""):null,
-             notaFiscal:nf?nf.replace(/\s/g,""):null, pedido:pedido||null,
-             corridas:[], page:pageNum };
-  }
-
-  // ----- Formato HIPPER FREIOS -----
-  const certNum = (all.match(/N[ºo°]\s*(?:do\s*Certificado)?\s*:?\s*([0-9]{2,4}\s*\/\s*[0-9]{2})/i)||[])[1];
-  const data    = (all.match(/Data\s*:?\s*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i)||[])[1];
-  const desc    = (all.match(/Descri[çc][ãa]o do produto\s+(.+?)\s+(?:Fornecedor|supplier)/i)||[])[1];
-  const forn    = (all.match(/Fornecedor[^\n]*?\s([A-Z][A-Z0-9À-Ú&.\- ]{2,}?)(?:\s{2,}|\n|$)/)||[])[1];
-  const material= (all.match(/Material\s+(NBR[^\n]+?)(?:\s{2,}|\n|$)/i)||[])[1];
-  const qtdMatch= all.match(/Quantidade[\s\S]{0,40}?([0-9]{1,3}(?:[.\s][0-9]{3})*(?:,[0-9]+)?)/i);
-  const quantidade = qtdMatch ? qtdMatch[1].replace(/\s/g,"") : null;
-  const nf      = (all.match(/Nota\s*Fiscal[\s\S]{0,40}?([0-9]{4,6}(?:\s*[-–]\s*[0-9]{4,6})?)/i)||[])[1];
-
-  // corridas / rastreabilidade: todos os códigos "M" + 2 a 4 dígitos
-  const corridas = [...new Set((all.match(/\bM\s?[0-9]{2,4}\b/g)||[]).map(s=>s.replace(/\s/g,"").toUpperCase()))];
-
-  return { certNum: certNum?certNum.replace(/\s/g,""):null, data, desc:desc?desc.trim():null,
-           fornecedor:forn?forn.trim():null, material:material?material.trim():null,
-           quantidade, notaFiscal:nf?nf.replace(/\s/g,""):null, pedido:null, corridas, page:pageNum };
-}
-
-/* Consolida certificados: junta laudos repetidos (mesma chave) unindo as corridas
-   e preservando os campos mais completos; lista todas as páginas onde aparecem.
-   A chave é o nº de certificado (Hipper Freios) ou, na falta dele, a NF (Pandrol). */
-function dedupeChumbadores(list){
-  const clean = list.filter(c=>c.certNum || c.corridas.length || c.notaFiscal);
-  const byKey = new Map();
-  const semChave = [];
-  const keyOf = c => c.certNum ? "C:"+c.certNum : (c.notaFiscal ? "NF:"+c.notaFiscal : null);
-  for (const c of clean){
-    const k = keyOf(c);
-    if (!k){ semChave.push(c); continue; }
-    const prev = byKey.get(k);
-    if (!prev){ byKey.set(k, {...c, corridas:[...c.corridas], paginas:[c.page]}); continue; }
-    prev.corridas = [...new Set([...prev.corridas, ...c.corridas])].sort();
-    prev.paginas.push(c.page);
-    prev.data       = prev.data       || c.data;
-    prev.desc       = prev.desc       || c.desc;
-    prev.fornecedor = prev.fornecedor || c.fornecedor;
-    prev.material   = prev.material   || c.material;
-    prev.quantidade = prev.quantidade || c.quantidade;
-    prev.notaFiscal = prev.notaFiscal || c.notaFiscal;
-    prev.pedido     = prev.pedido     || c.pedido;
-  }
-  const merged = [...byKey.values(), ...semChave.map(c=>({...c, paginas:[c.page]}))];
-  merged.sort((a,b)=>a.page-b.page);
-  return merged;
+  return lots;
 }
 
 /* Reconstrói linhas a partir das posições (y agrupado), depois extrai campos */
@@ -194,30 +81,6 @@ function parseCertPage(items, pageNum){
   const lote = (allText.match(/LOTE:\s*([0-9]{3,6})/i)||[])[1] || null;
   const tipo = (allText.match(/TIPO DE DORMENTE:\s*([^\n]+?)(?:\s+LOTE:|$)/i)||[])[1] || null;
   const data = (allText.match(/DATA DE PRODU[ÇC][ÃA]O:\s*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i)||[])[1] || null;
-
-  // ----- Rastreabilidade do AÇO DE PROTENSÃO (seção "CORTE DE AÇO") -----
-  // Esta é a ÚNICA rastreabilidade de matéria-prima que consta na própria página
-  // do lote produzido. Traz, por bobina: Nota fiscal, Nº da Bobina e Módulo de
-  // Elasticidade. (A página do lote NÃO traz o lote/corrida do CHUMBADOR — esse
-  // dado vive só na seção 4.3, em nível de databook.)
-  const aco = []; // [{nf, bobina, modulo}]
-  {
-    let lnNF=null, lnBob=null, lnMod=null;
-    for (const ln of lines){
-      if (/Nota\s*fiscal/i.test(ln) && lnNF===null) lnNF = ln;
-      else if (/N[ºo°]\s*da\s*Bobina/i.test(ln) && lnBob===null) lnBob = ln;
-      else if (/M[oó]dulo\s*de\s*Elasticidade/i.test(ln) && lnMod===null) lnMod = ln;
-    }
-    const grab = (ln, re) => ln ? (ln.replace(re,"").match(/[0-9][0-9.,]*/g)||[]) : [];
-    const nfs  = grab(lnNF,  /Nota\s*fiscal\s*:?/i);
-    const bobs = grab(lnBob, /N[ºo°]\s*da\s*Bobina\s*:?/i);
-    const mods = grab(lnMod, /M[oó]dulo\s*de\s*Elasticidade\s*:?/i);
-    const n = Math.max(nfs.length, bobs.length, mods.length);
-    for (let i=0;i<n;i++){
-      const nf=nfs[i]||null, bo=bobs[i]||null, mo=mods[i]||null;
-      if (nf||bo||mo) aco.push({nf, bobina:bo, modulo:mo});
-    }
-  }
 
   // ----- Compressão axial e tração -----
   // A 1ª linha de cura é a DESPROTENSÃO (transferência da protensão). O tempo
@@ -275,7 +138,7 @@ function parseCertPage(items, pageNum){
     tempRows.sort((a,b)=>a.h-b.h);
   }
 
-  return { lote, tipo, data, comp, trac, temp:tempRows, page:pageNum, primeiroDia, aco };
+  return { lote, tipo, data, comp, trac, temp:tempRows, page:pageNum, primeiroDia };
 }
 
 /* Métricas de temperatura derivadas do PDF */
@@ -461,7 +324,7 @@ function crossCheck(pdfLots, xls, project){
     else status="bad";
 
     lots.push({lote:pl.lote, key, status, pct, fields, hasXls:!!x,
-      tipo:pl.tipo, data:pl.data, tempMetrics:tm, page:pl.page, aco:pl.aco||[],
+      tipo:pl.tipo, data:pl.data, tempMetrics:tm, page:pl.page,
       xlsStatus: x?x.status:null, xlsMotivo: x?x.motivo:null,
       okCount:ok, totCount:tot});
   }
@@ -542,15 +405,13 @@ $("#runBtn").addEventListener("click", async ()=>{
   $("#runBtn").disabled=true;
   setStatus("Lendo databook (PDF)…", true);
   try{
-    const pdf = await parsePDF(STATE.pdfFile, t=>setStatus(t,true));
-    const pdfLots = pdf.lots;
+    const pdfLots = await parsePDF(STATE.pdfFile, t=>setStatus(t,true));
     if (!pdfLots.length){ setStatus("Nenhum certificado de qualidade encontrado no PDF. Confira o arquivo.", false); $("#runBtn").disabled=false; return; }
     setStatus("Lendo planilha (XLSX)…", true);
     const xls = await parseXLSX(STATE.xlsFile);
     setStatus("Cruzando lote a lote…", true);
     await new Promise(r=>setTimeout(r,120));
     const result = crossCheck(pdfLots, xls, STATE.project);
-    result.chumbadores = pdf.chumbadores || [];
     STATE.result = result;
     render(result);
     setStatus(`Concluído: ${result.lots.length} lotes do databook conferidos.`, false);
@@ -573,8 +434,7 @@ $("#resetBtn").addEventListener("click", ()=>{
   $("#xlsName").textContent="Selecionar ou arrastar"; $("#xlsSub").textContent="Controle de fabricação";
   $("#filePdf").value=""; $("#fileXls").value="";
   $("#tabs").classList.remove("show"); $("#resetBtn").style.display="none"; $("#projPill").style.display="none";
-  ["dash","cmp","lots","chumb"].forEach(p=>$("#panel-"+p).innerHTML="");
-  $("#chumbBadge").textContent="0";
+  ["dash","cmp","lots"].forEach(p=>$("#panel-"+p).innerHTML="");
   checkReady(); setStatus("Aguardando os dois arquivos.", false);
   window.scrollTo({top:0,behavior:"smooth"});
 });
@@ -597,10 +457,9 @@ function statusChip(s){
 }
 
 function render(res){
-  renderDash(res); renderCmp(res); renderLots(res); renderChumb(res);
+  renderDash(res); renderCmp(res); renderLots(res);
   $("#cmpBadge").textContent=res.lots.length;
   $("#lotsBadge").textContent=res.lots.length;
-  $("#chumbBadge").textContent=(res.chumbadores&&res.chumbadores.length)||0;
 }
 
 function renderDash(res){
@@ -661,13 +520,6 @@ function renderDash(res){
   // duplicados na planilha
   if (res.dups && res.dups.length){
     html += `<div class="notice warn"><span class="ni">⚠</span><div><b>${res.dups.length} lote(s) aparecem mais de uma vez na planilha</b> — usei a primeira ocorrência de cada: ${res.dups.map(d=>`<span class="mono">${d.lote}</span>`).join(", ")}. Vale conferir se há linhas repetidas.</div></div>`;
-  }
-  // chumbadores (fixações) lidos da seção 4.3 do databook
-  if (res.chumbadores && res.chumbadores.length){
-    const corr=[...new Set(res.chumbadores.flatMap(c=>c.corridas))].sort();
-    const ids = corr.length ? corr : [...new Set(res.chumbadores.map(c=>c.notaFiscal).filter(Boolean))].map(n=>"NF "+n).sort();
-    const rotulo = corr.length ? "corrida(s)" : "nota(s) fiscal(is)";
-    html += `<div class="notice info"><span class="ni">ℹ</span><div><b>${res.chumbadores.length} laudo(s) de chumbador/fixação</b> lidos da seção 4.3 — ${ids.length} ${rotulo}: ${ids.map(c=>`<span class="mono">${c}</span>`).join(", ")}. Esses laudos valem para o databook inteiro (o lote do chumbador não consta na página de cada lote). Detalhes na aba <b>Chumbadores</b>.</div></div>`;
   }
 
   // mini panorama de lotes
@@ -775,29 +627,6 @@ function cmpCardHTML(l){
     }
   }
 
-  // --- Rastreabilidade do aço de protensão (só consta no PDF) ---
-  // Esta é a rastreabilidade de matéria-prima que a PÁGINA DO LOTE traz.
-  // A planilha não tem coluna equivalente, então é informativo (não entra no %).
-  const aco = l.aco||[];
-  const acoBlock = aco.length ? `
-    <div class="cmp-body" style="border-top:1px dashed var(--line)">
-      <div class="aco-head">Rastreabilidade do aço de protensão (seção “Corte de aço” do PDF)</div>
-      <table class="cmp">
-        <thead><tr><th style="width:22%">Bobina</th><th style="width:26%">Nota fiscal</th><th style="width:34%">Nº da bobina</th><th style="width:18%">Mód. elast.</th></tr></thead>
-        <tbody>
-          ${aco.map((b,i)=>`<tr>
-            <td class="field-name">Bobina ${String(i+1).padStart(2,"0")}</td>
-            <td class="v mono ${b.nf?"":"miss"}">${b.nf||"sem dado"}</td>
-            <td class="v mono ${b.bobina?"":"miss"}">${b.bobina||"sem dado"}</td>
-            <td class="v mono ${b.modulo?"":"miss"}">${b.modulo||"—"}</td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-      <div class="aco-note">A página do lote não registra o lote/corrida do <b>chumbador</b> — essa rastreabilidade fica na aba <b>Chumbadores</b> (seção 4.3), em nível de databook.</div>
-    </div>` : "";
-
-  const hasBody = l.hasXls || aco.length>0;
-
   return `
   <div class="cmp-lot ${l.status}" data-key="${l.key}" data-lote="${l.lote}" data-status="${l.status}">
     <div class="cmp-head">
@@ -806,12 +635,11 @@ function cmpCardHTML(l){
         ${l.hasXls?`<div style="margin-top:4px">${statusChip(l.status)} <span class="delta">${l.okCount}/${l.totCount} parâmetros conferem</span></div>`:""}
       </div>
       ${pctBlock}
-      ${hasBody?'<span class="caret">▼</span>':""}
+      ${l.hasXls?'<span class="caret">▼</span>':""}
     </div>
     ${l.hasXls?`<div class="cmp-body"><table class="cmp">
       <thead><tr><th style="width:32%">Parâmetro</th><th style="width:28%">Databook (PDF)</th><th style="width:28%">Planilha (Rumo)</th><th class="res" style="width:12%">Resultado</th></tr></thead>
       <tbody>${rowsHTML}</tbody></table></div>`:""}
-    ${acoBlock}
   </div>`;
 }
 
@@ -911,82 +739,4 @@ function lotRowHTML(l){
     <td style="font-size:12px;color:var(--ink-soft)">${st}</td>
     <td class="mono" style="color:var(--ghost)">${l.page}</td>
   </tr>`;
-}
-/* ===================================================================
-   6) ABA CHUMBADORES (fixações) — seção 4.3 do databook
-   -------------------------------------------------------------------
-   IMPORTANTE: o databook NÃO vincula o chumbador a cada lote produzido.
-   A página do "Certificado de Qualidade do Lote" só registra a
-   rastreabilidade do AÇO de protensão (bobinas). Os chumbadores/ombreiras
-   têm laudos próprios do fornecedor, válidos para todo o databook, cujo
-   lote/rastreabilidade é a CORRIDA ("M___"). É isso que esta aba consolida.
-   =================================================================== */
-function renderChumb(res){
-  const list = res.chumbadores || [];
-  const allCorridas = [...new Set(list.flatMap(c=>c.corridas))].sort();
-  // identificador de lote/rastreabilidade de cada laudo: corrida(s) ou, na falta, a NF
-  const rastreabOf = c => c.corridas.length ? c.corridas.join(", ") : (c.notaFiscal ? "NF "+c.notaFiscal : "—");
-  const idOf = c => c.certNum || (c.notaFiscal ? "NF "+c.notaFiscal : (c.pedido ? "Pedido "+c.pedido : "—"));
-  // chips do topo: corridas, se houver; senão as NFs (caso Pandrol)
-  const usaCorrida = allCorridas.length>0;
-  const chips = usaCorrida ? allCorridas
-    : [...new Set(list.map(c=>c.notaFiscal).filter(Boolean))].sort();
-  const fornecedores = [...new Set(list.map(c=>c.fornecedor).filter(Boolean))];
-
-  let html = `
-  <div class="notice info"><span class="ni">ℹ</span><div>
-    <b>O lote do chumbador não aparece na página de cada lote produzido.</b>
-    No databook da Cavan, a página do “Certificado de Qualidade do Lote” traz a rastreabilidade
-    do <b>aço de protensão</b> (bobinas), e os <b>chumbadores/ombreiras</b> têm laudos próprios do
-    fornecedor na <b>seção 4.3</b> — válidos para o databook inteiro. O identificador de lote do
-    chumbador é a <b>corrida</b> (“M___”, laudos Hipper Freios) ou a <b>nota fiscal</b> de cada
-    expedição (laudos Pandrol). Abaixo estão os laudos lidos do PDF.
-  </div></div>`;
-
-  if (!list.length){
-    html += `<div class="notice warn"><span class="ni">⚠</span><div>Não encontrei laudos de fixações/chumbadores neste PDF (seção 4.3). Se o databook tiver outro layout, me envie que ajusto o leitor.</div></div>`;
-    $("#panel-chumb").innerHTML = html;
-    return;
-  }
-
-  // resumo: identificadores de lote (corridas ou NFs) utilizados no databook
-  html += `
-  <div class="section">
-    <div class="section-h"><h3>Lotes de chumbador neste databook</h3>
-      <p>${chips.length} ${usaCorrida?"corrida(s)":"nota(s) fiscal(is)"} distinta(s), em ${list.length} laudo(s)${fornecedores.length?` — fornecedor(es): ${fornecedores.join(", ")}`:""}.</p></div>
-    <div class="section-b">
-      <div class="chips-wrap">
-        ${chips.map(c=>`<span class="chip-corrida mono">${usaCorrida?c:"NF "+c}</span>`).join("")}
-      </div>
-    </div>
-  </div>`;
-
-  // tabela de laudos
-  html += `
-  <div class="section">
-    <div class="section-h"><h3>Laudos de qualidade — fixações (seção 4.3)</h3>
-      <p>Cada laudo do fornecedor, com o lote/rastreabilidade que ele certifica.</p></div>
-    <div class="section-b" style="padding:0">
-      <table class="cmp" style="font-size:13px">
-        <thead><tr>
-          <th style="padding-left:22px">Certificado / NF</th><th>Data</th>
-          <th>Produto</th><th>Fornecedor</th>
-          <th>Lote / rastreabilidade</th><th>Qtd.</th><th>Pág. PDF</th>
-        </tr></thead>
-        <tbody>
-          ${list.map(c=>`<tr>
-            <td class="mono" style="padding-left:22px;font-weight:600">${idOf(c)}</td>
-            <td class="mono">${c.data||"—"}</td>
-            <td style="font-size:12px">${c.desc||"—"}</td>
-            <td style="font-size:12px">${c.fornecedor||"—"}</td>
-            <td class="mono">${rastreabOf(c)}</td>
-            <td class="mono">${c.quantidade||"—"}</td>
-            <td class="mono" style="color:var(--ghost)">${(c.paginas&&c.paginas.length?c.paginas:[c.page]).join(", ")}</td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
-
-  $("#panel-chumb").innerHTML = html;
 }

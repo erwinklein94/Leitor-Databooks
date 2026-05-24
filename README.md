@@ -30,25 +30,8 @@ Tudo roda **no navegador** — nenhum arquivo é enviado a servidores. Funciona 
 ### Abas
 
 - **Dashboard** — totais (conformes / parciais / não conformes / sem registro), aderência média e panorama por lote.
-- **Comparação lado a lado** — para cada lote, PDF × Planilha em: tipo, data de produção, compressão axial (todos os dias), tração na flexão e cura/temperatura (temperatura máxima e variação máxima por hora, extraídas do PDF). Mostra também a **rastreabilidade do aço de protensão** (bobinas: nota fiscal, nº da bobina e módulo de elasticidade) lida da seção “Corte de aço” da própria página do lote. Ao final, o **% de aderência** do lote.
+- **Comparação lado a lado** — para cada lote, PDF × Planilha em: tipo, data de produção, compressão axial (todos os dias), tração na flexão e cura/temperatura (temperatura máxima e variação máxima por hora, extraídas do PDF). Ao final, o **% de aderência** do lote.
 - **Lotes** — tabela com status, aderência e atalho para a comparação.
-- **Chumbadores** — consolida os laudos de qualidade das **fixações (chumbadores/ombreiras)** da seção 4.3 do databook: nº do certificado, data, produto, fornecedor, quantidade e a(s) **corrida(s)** (código “M___”), que é o lote/rastreabilidade do chumbador.
-
-## Rastreabilidade de matéria-prima: aço × chumbador
-
-Ponto importante sobre os databooks da Cavan: **a página do “Certificado de Qualidade do Lote” NÃO registra o lote do chumbador.** O único material rastreado por lote produzido é o **aço de protensão** (seção “Corte de aço”, com nota fiscal, nº da bobina e módulo de elasticidade de cada bobina). Os **chumbadores/ombreiras** têm laudos próprios do fornecedor na **seção 4.3 – Certificados de Qualidade – Fixações**, válidos para o databook inteiro; o identificador de lote do chumbador é a **corrida (“M___”)** nos laudos Hipper Freios, ou a **nota fiscal (NF) de cada expedição** nos laudos Pandrol. Por isso o site:
-
-- exibe a rastreabilidade do **aço por lote** dentro da aba *Comparação lado a lado* (informativo — a planilha não tem coluna equivalente, então não entra no % de aderência); e
-- consolida os **chumbadores em nível de databook** na aba *Chumbadores*, deixando claro que o documento não os vincula lote a lote.
-
-Se algum databook passar a trazer o lote do chumbador na própria página do lote, basta enviá-lo que o leitor é ajustado para casar essa informação por lote.
-
-### Databooks validados na rastreabilidade de chumbadores
-
-- **019/25 — FMT, Santa Lúcia, julho/2025** (303 págs.): 52 lotes, aço lido em 52/52, 16 laudos de chumbador (corridas M106…M191).
-- **020/25 — Malha Paulista, Santa Lúcia, julho/2025** (199 págs.): 13 lotes, aço lido em 13/13, 5 laudos de chumbador (corridas M077, M078, M088, M115). Mesmo formulário FQA 014.32 e mesmos laudos Hipper Freios; o produto aparece como “OMBREIRA FAST-CLIP 13156” em vez de “TR 57/68 UIC 60SI”, mas o leitor capta a descrição genericamente. Nenhum ajuste de código foi necessário.
-- **021/25 — FMT, Santa Lúcia, agosto/2025** (295 págs.): 50 lotes, aço lido em 50/50, 45 páginas de laudo de chumbador que o leitor consolida em **37 certificados únicos** (21 corridas, de M106 a M202). Inclui desprotensão tanto em frações (0,5–0,8 dias) quanto ≥ 1 dia (1,6–1,8 dias), todas tratadas como transferência da protensão. A partir deste databook o leitor passou a **deduplicar os laudos de chumbador por nº de certificado**, unindo as corridas e listando todas as páginas onde cada laudo aparece — assim a aba *Chumbadores* não repete o mesmo certificado.
-- **022/25 — Malha Paulista, Santa Lúcia, agosto/2025** (181 págs.): 10 lotes, aço lido em 10/10, 5 laudos de chumbador. **Novo fornecedor/layout: PANDROL.** Em vez do laudo Hipper Freios (“Relatório Técnico de Qualidade”, com corrida “M___”), a seção 4.3 traz o “Certificado de Qualidade / Quality Certificate” da Pandrol, sem corrida. Nesses laudos o **identificador de lote/rastreabilidade do chumbador é a nota fiscal (NF) de cada expedição** (ex.: 32.893, 32.947, 32.962, 32.986, 32.987), com data de expedição, pedido e quantidade expedida. O leitor agora reconhece **os dois formatos** (Hipper Freios e Pandrol) automaticamente, usa a corrida quando existe e a NF quando não existe, e deduplica por nº de certificado ou por NF.
 
 ## Regras de cruzamento
 
