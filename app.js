@@ -510,10 +510,10 @@ function renderDash(res){
   <div class="section">
     <div class="section-h"><h3>Aderência média do databook</h3><p>Média do % de batimento entre os lotes que existem nas duas fontes.</p></div>
     <div class="section-b">
-      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-        <div style="font-size:52px;font-weight:900;letter-spacing:-2px;color:var(--rumo-green)">${avg}<span style="font-size:24px">%</span></div>
+      <div class="avg-wrap">
+        <div class="avg-number">${avg}<span>%</span></div>
         <div style="flex:1;min-width:220px">
-          <div style="height:14px;border-radius:999px;background:var(--line);overflow:hidden;display:flex">
+          <div class="avg-track">
             <div style="width:${(ok/n*100)||0}%;background:var(--ok)"></div>
             <div style="width:${(warn/n*100)||0}%;background:var(--warn)"></div>
             <div style="width:${(bad/n*100)||0}%;background:var(--bad)"></div>
@@ -714,7 +714,7 @@ function renderLots(res){
       </div>
     </div>
     <div class="section-b" style="padding:0">
-      <table class="cmp" style="font-size:13.5px">
+      <table class="cmp" style="font-size:12.5px">
         <thead><tr>
           <th style="padding-left:22px">Lote</th><th>Status</th><th>Aderência</th>
           <th>Parâmetros OK</th><th>Temp. máx (PDF)</th><th>Status planilha</th><th>Pág. PDF</th>
