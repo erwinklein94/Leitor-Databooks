@@ -22,6 +22,23 @@ async function main(){
   assert.equal(repeated[0].page,2);
   assert.equal(repeated[0].comp[28][0],41);
   assert.equal(repeated[0].tipo,'Dormente');
+  const yearMismatch=vm.runInContext(`uniqueLots([
+    {lote:'G1015',data:'02/01/2024',tipo:null,page:1,comp:{28:[75,76]},trac:{},temp:[]},
+    {lote:'G1015/23',data:'02/01/2024',tipo:'Bitola Mista',quantidade:330,page:2,comp:{},trac:{},temp:[]}
+  ])`,context);
+  assert.equal(yearMismatch.length,1);
+  assert.equal(yearMismatch[0].lote,'G1015/23');
+  assert.equal(yearMismatch[0].quantidade,330);
+  const coverLots=vm.runInContext(`coverLotIds([{lines:[
+    'DATA BOOK 010/23','Lotes: P0050/22 a P0052/22 e G1001/22 e 00189/22 a 00190/22',
+    'Quantidade: 200', 'PRODUTO: dormente'
+  ]}])`,context);
+  assert.deepEqual(Array.from(coverLots),['P50/22','P51/22','P52/22','G1001/22','189/22','190/22']);
+  const splitCover=vm.runInContext(`coverLotIds([{lines:[
+    'DATA BOOK','(Lotes: R501/21 a R508/21)','Quantidade: 2300'
+  ]},{lines:['Lotes: 00124/22 a 001 55 /22','Quantidade: 200'] }])`,context);
+  assert.equal(splitCover.length,40);
+  assert.ok(splitCover.includes('155/22'));
   pdfjsLib.GlobalWorkerOptions.workerSrc=pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
   const pdf=await PDFDocument.create();
   const page=pdf.addPage([595,842]);

@@ -101,6 +101,13 @@ function coverProduct(pages){
   }
   return "";
 }
+function lotDateRange(lots){
+  const dates=lots.map(lot=>String(lot.data||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/))
+    .filter(Boolean).map(match=>({date:match[0],order:Number(match[3])*10000+Number(match[2])*100+Number(match[1])}))
+    .sort((a,b)=>a.order-b.order);
+  if (!dates.length) return '';
+  return dates.length===1||dates[0].date===dates.at(-1).date?dates[0].date:`${dates[0].date} a ${dates.at(-1).date} (datas dos lotes)`;
+}
 function aggregateAnalysis(pages){
   const records={sand:[],stone:[]};
   let foundForm=false;
@@ -137,7 +144,7 @@ function extractPart1(pdf, fileName,cementRows){
   const row=Array(headers.length).fill("");
   row[0]=fileName.replace(/\.pdf$/i,"");
   row[1]=firstPageField(pdf.pages.slice(0,2),["Unidade industrial:","Fornecedor:","Unidade:","Fabricante:"],true);
-  row[2]=firstPageField(pdf.pages.slice(0,2),["Período de produção:","Período de fabricação:"],true) || [...new Set(pdf.lots.map(lot=>lot.data).filter(Boolean))].join("; ");
+  row[2]=firstPageField(pdf.pages.slice(0,2),["Período de produção:","Período de fabricação:"],true) || lotDateRange(pdf.lots);
   row[3]=coverProduct(pdf.pages.slice(0,2)) || [...new Set(pdf.lots.map(lot=>lot.tipo).filter(Boolean))].join("; ");
   row[4]=lotSummary(pdf.lots,lot=>lot.temp.map(reading=>`${reading.hhmm} (${[reading.ini,reading.meio,reading.fim].map(displayNumber).join("/")})`));
   row[5]=firstPageField(pdf.pages,["Temperatura ambiente no início da concretagem","Temperatura ambiente:"],false);
@@ -261,9 +268,9 @@ function showLotView(index){
   if (!lots.length){
     content='<p class="lot-message">Nenhum lote foi identificado. Confira se o PDF contém texto selecionável e registros de lote.</p>';
   }else if (index===null){
-    const columns=["Lote","Produção","Página PDF","Comp. 28 d CP1","Comp. 28 d CP2","Flexão 28 d CP1","Flexão 28 d CP2","Temp. máxima"];
+    const columns=["Lote","Produção","Qtd. produzida","Página PDF","Comp. 28 d CP1","Comp. 28 d CP2","Flexão 28 d CP1","Flexão 28 d CP2","Temp. máxima"];
     const body=STATE.extracted["Parte 2"].map((row,i)=>{
-      const cells=[lotLabel(lots[i],i),row[2],row[3],row[8],row[9],row[12],row[13],row[14]];
+      const cells=[lotLabel(lots[i],i),row[2],lots[i].quantidade??"",row[3],row[8],row[9],row[12],row[13],row[14]];
       return `<tr><th scope="row"><button type="button" data-lot-index="${i}" class="lot-row-link">${escapeExtracted(cells[0])}</button></th>${cells.slice(1).map(value=>`<td>${escapeExtracted(value===""?"—":value)}</td>`).join("")}</tr>`;
     }).join("");
     content=`<p class="lot-message">Visão geral do Data Book: cada lote ocupa uma linha. Selecione um lote para ver seus dados separadamente.</p>
@@ -272,7 +279,7 @@ function showLotView(index){
     const lot=lots[index], row=STATE.extracted["Parte 2"][index];
     const fields=EXPORT_HEADERS["Parte 2"].map((header,i)=>({header,value:row[i]})).slice(2);
     const temperature=lot.temp.length?`<div class="lot-table-scroll"><table class="lot-table"><thead><tr><th>Horário</th><th>Início (°C)</th><th>Meio (°C)</th><th>Fim (°C)</th></tr></thead><tbody>${lot.temp.map(reading=>`<tr><th scope="row">${escapeExtracted(reading.hhmm)}</th>${[reading.ini,reading.meio,reading.fim].map(value=>`<td>${escapeExtracted(value??"—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:'<p class="lot-message">Não foram identificadas leituras de temperatura para este lote.</p>';
-    content=`<p class="lot-message"><strong>${escapeExtracted(lotLabel(lot,index))}</strong>${lot.tipo?` · ${escapeExtracted(lot.tipo)}`:""}. Dados encontrados na página ${escapeExtracted(lot.page)}.</p>
+    content=`<p class="lot-message"><strong>${escapeExtracted(lotLabel(lot,index))}</strong>${lot.tipo?` · ${escapeExtracted(lot.tipo)}`:""}${lot.quantidade!=null?` · ${escapeExtracted(lot.quantidade)} produzidos`:""}. Dados encontrados na página ${escapeExtracted(lot.page)}.</p>
       <div class="lot-detail-grid">${fields.map(({header,value})=>`<div class="lot-detail"><span>${escapeExtracted(header)}</span><strong>${escapeExtracted(value===""?"—":value)}</strong></div>`).join("")}</div>
       <h4 class="lot-subtitle">Leituras de temperatura</h4>${temperature}`;
   }

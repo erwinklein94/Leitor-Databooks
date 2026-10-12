@@ -15,6 +15,16 @@ const production=vm.runInContext('parseProductionForm(lines,6)',context);
 assert.equal(production.lote,'00124/22');
 assert.equal(production.data,'07/09/2022');
 assert.equal(production.tipo,'Bitola Mista');
+context.lines=[
+  'INSPEÇÕES DIMENSIONAIS DE DORMENTES DE CONCRETO PROTENDIDO',
+  'FQA 014.08',
+  'Lote: 00452/23 Tipo: Bitola Larga Data ensaio: 05/10/2023',
+  'Pista: 02 Qdt. Produzida: 96 Data concretagem: 04/10/2023'
+];
+const dimensional=vm.runInContext('parseDimensionalForm(lines,32)',context);
+assert.equal(dimensional.lote,'00452/23');
+assert.equal(dimensional.data,'04/10/2023');
+assert.equal(dimensional.quantidade,96);
 
 const items=[
   {str:'CONTROLE TECNOLÓGICO DO CONCRETO',x:80,y:500},

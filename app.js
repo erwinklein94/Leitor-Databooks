@@ -30,6 +30,8 @@ async function parsePDF(file, statusCb){
     if (production) lotRecords.push(production);
     const inspection=parseInspectionForm(lines,p);
     if (inspection) lotRecords.push(inspection);
+    const dimensional=parseDimensionalForm(lines,p);
+    if (dimensional) lotRecords.push(dimensional);
     lotRecords.push(...parseConcreteForm(items,p));
     if (/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)){
       const certificate=parseCertPage(items,p);
@@ -40,26 +42,29 @@ async function parsePDF(file, statusCb){
   return {lots:uniqueLots(lotRecords), pages};
 }
 
+function lotIdentity(lot){
+  const match=String(lot.lote||"").match(/^([A-Z]?)(\d{3,6})(?:[/-](\d{2,4}))?$/i);
+  if (!match) return null;
+  const year=match[3] ? match[3].slice(-2) : (String(lot.data||"").match(/\/(\d{2,4})$/)||[])[1]?.slice(-2)||"";
+  return {base:`${match[1].toUpperCase()}${Number(match[2])}`,year};
+}
 /* Um mesmo certificado pode aparecer mais de uma vez no PDF. Consolida as
    páginas repetidas sem misturar lotes diferentes. */
 function uniqueLots(lots){
   const unique=[];
-  const identity=lot=>{
-    const match=String(lot.lote||"").match(/^([A-Z]?)(\d{3,6})(?:[/-](\d{2,4}))?$/i);
-    if (!match) return null;
-    const year=match[3] ? match[3].slice(-2) : (String(lot.data||"").match(/\/(\d{2,4})$/)||[])[1]?.slice(-2)||"";
-    return {base:`${match[1].toUpperCase()}${Number(match[2])}`,year};
-  };
   for (const lot of lots){
-    const key=identity(lot);
+    const key=lotIdentity(lot);
     const original=key&&unique.find(other=>{
-      const current=identity(other);
-      return current&&current.base===key.base&&(!current.year||!key.year||current.year===key.year);
+      const current=lotIdentity(other);
+      const sameProductionDate=other.data&&lot.data&&other.data===lot.data;
+      const oneWithoutYear=/[/-]\d{2,4}$/.test(other.lote||'')!==/[/-]\d{2,4}$/.test(lot.lote||'');
+      return current&&current.base===key.base&&(!current.year||!key.year||current.year===key.year||(oneWithoutYear&&sameProductionDate));
     });
     if (!original){unique.push(lot);continue;}
     if (!/[/-]\d{2,4}$/.test(original.lote||"") && /[/-]\d{2,4}$/.test(lot.lote||"")) original.lote=lot.lote;
     original.data ||= lot.data;
     original.tipo ||= lot.tipo;
+    original.quantidade ||= lot.quantidade;
     for (const age of Object.keys(lot.comp))
       if (!original.comp[age] || original.comp[age].filter(value=>value!=="").length<lot.comp[age].filter(value=>value!=="").length)
         original.comp[age]=lot.comp[age];
@@ -73,6 +78,28 @@ function uniqueLots(lots){
     }
   }
   return unique;
+}
+function coverLotIds(pages){
+  const codes=[];
+  for (const page of pages.slice(0,2)){
+    const start=page.lines.findIndex(line=>/^\s*\(?\s*LOTES\s*:?/i.test(line));
+    if (start<0) continue;
+    const section=[];
+    for (const line of page.lines.slice(start,start+35)){
+      if (section.length && /^\s*(?:QUANTIDADE|PRODUTO|MODELO|UNIDADE INDUSTRIAL)\s*:?/i.test(line)) break;
+      section.push(line);
+    }
+    const body=section.join(' ').replace(/\b([A-Z]?\d{1,4})\s+(\d{1,3})\s*([/-])\s*(\d{2,4})\b/gi,'$1$2$3$4');
+    const pattern=/\b([A-Z]?)(\d{3,6})[/-](\d{2,4})\b(?:\s+a\s+\b([A-Z]?)(\d{3,6})[/-](\d{2,4})\b)?/gi;
+    for (const match of body.matchAll(pattern)){
+      const [prefix,startNumber,year]=[match[1].toUpperCase(),Number(match[2]),match[3].slice(-2)];
+      const endNumber=match[5]?Number(match[5]):startNumber;
+      const sameRange=!match[5]||(match[4].toUpperCase()===prefix&&match[6].slice(-2)===year&&endNumber>=startNumber&&endNumber-startNumber<=500);
+      if (sameRange) for (let number=startNumber;number<=endNumber;number++) codes.push(`${prefix}${number}/${year}`);
+      else {codes.push(`${prefix}${startNumber}/${year}`);codes.push(`${match[4].toUpperCase()}${endNumber}/${match[6].slice(-2)}`);}
+    }
+  }
+  return [...new Set(codes)];
 }
 
 function pdfPageLines(items){
@@ -233,6 +260,16 @@ function reviewMessages(pdf,extracted){
   const lotYears=new Set(pdf.lots.map(lot=>String(lot.data||"").match(/\/(20\d{2})$/)?.[1]).filter(Boolean));
   const coverYears=[...String(extracted["Parte 1"][0][2]).matchAll(/20\d{2}/g)].map(match=>match[0]);
   if (lotYears.size && coverYears.some(year=>!lotYears.has(year))) notes.push("O período impresso na capa contém um ano diferente das datas dos lotes. Confira a capa do PDF.");
+  const listed=new Set(coverLotIds(pdf.pages));
+  if (listed.size){
+    const outside=pdf.lots.filter(lot=>{
+      const key=lotIdentity(lot);
+      return key&&key.year&&!listed.has(`${key.base}/${key.year}`);
+    });
+    if (outside.length) notes.push(`${outside.length} lote(s) aparecem nos formulários, mas não na lista da capa: ${outside.slice(0,8).map(lot=>lot.lote).join(', ')}${outside.length>8?'…':''}.`);
+  }
+  const unreadablePages=pdf.pages.filter(page=>!page.lines.length).length;
+  if (unreadablePages) notes.push(`${unreadablePages} página(s) sem texto selecionável não foram lidas. Se contiverem ensaios, faça OCR do PDF para extrair esses dados.`);
   return notes;
 }
 function selectPdf(file){

@@ -1,4 +1,4 @@
-/* Formulários de Data Books com FQA 014.06, 014.07 e 014.09.
+/* Formulários de Data Books com FQA 014.06, 014.07, 014.08 e 014.09.
    O FQA 014.07 tem vários lotes por página e sete posições de ensaio:
    desprotensão, compressão/flexão aos 7, 14 e 28 dias. A posição na
    página distingue colunas ausentes; não deslocar os números para a esquerda. */
@@ -17,7 +17,15 @@ function formType(text){
   return (String(text).match(/\bBitola\s+(?:Larga|Mista|M[eé]trica|Estreita)\b/i)||[])[0]||null;
 }
 function formRecord(lote,page,source){
-  return {lote,tipo:null,data:null,comp:{},trac:{},temp:[],page,source};
+  return {lote,tipo:null,data:null,quantidade:null,comp:{},trac:{},temp:[],page,source};
+}
+function formQuantity(text){
+  const match=String(text).match(/Q(?:dt|td)\.?\s*Produzida\s*:?\s*(\d[\d.]*)/i);
+  return match?Number(match[1].replace(/\./g,'')):null;
+}
+function formConcreteDate(text){
+  const match=String(text).match(/Data\s+concretagem\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  return formDate(match?.[1]);
 }
 function parseProductionForm(lines,page){
   const text=lines.join("\n");
@@ -39,8 +47,20 @@ function parseInspectionForm(lines,page){
   if (!lote) return null;
   const record=formRecord(lote,page,"inspection");
   record.tipo=formType(text);
-  const dateLine=lines.find(line=>/Data concretagem/i.test(line));
-  record.data=formDate(dateLine);
+  record.data=formConcreteDate(text);
+  record.quantidade=formQuantity(text);
+  return record;
+}
+function parseDimensionalForm(lines,page){
+  const text=lines.join("\n");
+  if (!/INSPE[ÇC][ÕO]ES?\s+DIMENSIONAIS\s+DE\s+DORMENTES/i.test(text) || !/FQA\s*014[.]08/i.test(text)) return null;
+  const lotLine=lines.find(line=>/^\s*Lote\s*[:.]?\s*[A-Z]?\d{4,6}[/-]\d{2,4}\b/i.test(line));
+  const lote=lotLine&&formLotNumber(lotLine);
+  if (!lote) return null;
+  const record=formRecord(lote,page,"dimensional");
+  record.tipo=formType(text);
+  record.data=formConcreteDate(text);
+  record.quantidade=formQuantity(text);
   return record;
 }
 function formMeasurement(str){
