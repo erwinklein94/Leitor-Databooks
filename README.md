@@ -4,6 +4,8 @@ Site estático para ler **um Data Book em PDF**, apresentar os dados extraídos 
 
 O processamento ocorre no navegador. O PDF não é enviado a um servidor.
 
+A interface usa apenas preto, branco e cinza, com espaçamento compacto para mostrar mais informações na mesma tela. É possível alternar entre os temas claro e escuro.
+
 ## Uso
 
 1. Selecione ou arraste um Data Book em PDF.
@@ -32,7 +34,7 @@ Campos sem evidência suficiente ficam vazios. PDFs digitalizados como imagem pr
 
 ## Publicação
 
-O site funciona como página estática. Publique os arquivos HTML, CSS, JS e a pasta `assets` juntos no GitHub Pages ou em outro servidor estático. PDF.js e SheetJS são carregados por CDN, portanto o navegador precisa de acesso à internet para inicializar as bibliotecas.
+O site funciona como página estática. Publique os arquivos HTML, CSS e JS juntos no GitHub Pages ou em outro servidor estático. PDF.js e SheetJS são carregados por CDN, portanto o navegador precisa de acesso à internet para inicializar as bibliotecas.
 
 ## Verificação
 

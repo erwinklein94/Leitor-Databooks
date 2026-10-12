@@ -8,6 +8,11 @@ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 assert.equal((html.match(/type="file"/g)||[]).length,1);
 assert.match(html,/<input[^>]+id="filePdf"[^>]+accept="\.pdf,application\/pdf"/);
 assert.doesNotMatch(html,/fileXls|dropXls|projSel|Planilha de fabricação/);
+assert.doesNotMatch(html,/assets\/brand|<img\b|Projeto-Hub-Qualidade/i);
+const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+assert.doesNotMatch(css,/--navy|--yellow|--green|--blue/i);
+for (const color of css.match(/#[0-9a-f]{6}\b/gi)||[])
+  assert.ok(color.slice(1,3).toLowerCase()===color.slice(3,5).toLowerCase()&&color.slice(3,5).toLowerCase()===color.slice(5,7).toLowerCase(),`Cor fora da escala de cinza: ${color}`);
 const elements={};
 const context = vm.createContext({
   document: { getElementById: id => (elements[id] ||= {innerHTML:'',addEventListener() {}}) },

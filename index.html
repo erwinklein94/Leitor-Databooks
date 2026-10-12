@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Extração de dados do databook para as abas Parte 1, Parte 2 e Parte 3 do controle da Rumo, com exportação Excel." />
+<meta name="description" content="Leitor de Data Books em PDF com visualização por lote e exportação para Excel." />
 <title>Leitor de Databooks — DM de Concreto</title>
-<link rel="icon" type="image/png" href="assets/brand/favicon-rumo.png" />
 <script>
 (function(){
   try{
@@ -22,17 +21,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=lot-view-20261012" />
+<link rel="stylesheet" href="styles.css?v=mono-compact-20261012" />
 </head>
 <body>
 <div class="topbar">
   <div class="topbar-inner">
-    <div class="brand">
-      <img class="brand-logo" src="assets/brand/rumo-logo-positivo.png" alt="Rumo" />
-      <div class="brand-txt">
-        <b>Controle de Qualidade — DM de Concreto</b>
-        <span>Leitor de PDF · Exportação para Excel</span>
-      </div>
+    <div class="brand-txt">
+      <b>Leitor de Data Books</b>
+      <span>PDF → Excel · DM de Concreto</span>
     </div>
     <div class="topbar-spacer"></div>
     <div class="header-actions">
@@ -42,22 +38,9 @@
 </div>
 
 <div class="wrap">
-  <!-- HERO + SETUP -->
   <div class="hero">
-    <div class="hero-topline">
-      <a class="hub-back" href="https://erwinklein94.github.io/Projeto-Hub-Qualidade/">← Voltar ao Hub</a>
-    </div>
-    <div class="hero-grid">
-      <div>
-        <span class="kicker"><span class="blip"></span>Qualidade Rumo · Databooks</span>
-    <h1 class="title">Extraia os dados do <em>databook</em> para a planilha.</h1>
-    <p class="subtitle">Envie um Data Book em PDF. O leitor organiza as informações nas colunas das abas Parte 1, Parte 2 e Parte 3 e gera um Excel pronto para copiar e colar no controle.</p>
-      </div>
-      <aside class="hero-brand-card">
-        <img src="assets/brand/rumo-logo-tagline-positivo.png" alt="Rumo" />
-        <span>Mais dados visíveis, menos rolagem e leitura mais rápida.</span>
-      </aside>
-    </div>
+    <h1 class="title">Data Book em PDF, organizado por lote.</h1>
+    <p class="subtitle">Extraia as informações das Partes 1, 2 e 3, consulte cada lote e exporte os resultados para Excel.</p>
   </div>
 
   <div class="setup">
@@ -90,13 +73,13 @@
   </section>
 
   <div class="foot">
-    Processamento 100% local no navegador • Nenhum arquivo é enviado a servidores • <b>Rumo</b> · Engenharia de Qualidade
+    Processamento local no navegador · Nenhum PDF é enviado a servidores
   </div>
 </div>
 
-<script src="export-schema.js?v=lot-view-20261012"></script>
-<script src="app.js?v=lot-view-20261012"></script>
-<script src="extraction.js?v=lot-view-20261012"></script>
+<script src="export-schema.js?v=mono-compact-20261012"></script>
+<script src="app.js?v=mono-compact-20261012"></script>
+<script src="extraction.js?v=mono-compact-20261012"></script>
 <script>
 (function(){
   const btn = document.getElementById("themeToggle");
