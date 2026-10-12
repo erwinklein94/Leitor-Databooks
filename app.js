@@ -4,7 +4,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 /* ---------- Estado ---------- */
-const STATE = { pdfFile:null, extracted:null, busy:false };
+const STATE = { pdfFile:null, pdf:null, extracted:null, activeLotIndex:null, busy:false };
 
 /* ===================================================================
    LEITURA DO PDF  →  lotes e linhas de todas as páginas
@@ -28,7 +28,29 @@ async function parsePDF(file, statusCb){
     if (!/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)) continue;
     lots.push(parseCertPage(items, p));
   }
-  return {lots, pages};
+  return {lots:uniqueLots(lots), pages};
+}
+
+/* Um mesmo certificado pode aparecer mais de uma vez no PDF. Consolida as
+   páginas repetidas sem misturar lotes diferentes. */
+function uniqueLots(lots){
+  const byNumber=new Map();
+  const unique=[];
+  for (const lot of lots){
+    const key=lot.lote ? lot.lote.trim().toUpperCase() : null;
+    if (!key || !byNumber.has(key)){
+      unique.push(lot);
+      if (key) byNumber.set(key,lot);
+      continue;
+    }
+    const original=byNumber.get(key);
+    original.data ||= lot.data;
+    original.tipo ||= lot.tipo;
+    for (const age of Object.keys(lot.comp)) original.comp[age] ||= lot.comp[age];
+    for (const age of Object.keys(lot.trac)) original.trac[age] ||= lot.trac[age];
+    if (lot.temp.length>original.temp.length) original.temp=lot.temp;
+  }
+  return unique;
 }
 
 function pdfPageLines(items){
@@ -170,9 +192,12 @@ function setStatus(message,busy=false,error=false){
   $("#statusLine").classList.toggle("error",error);
 }
 function clearResults(){
+  STATE.pdf=null;
   STATE.extracted=null;
+  STATE.activeLotIndex=null;
   $("#exportBtn").disabled=true;
   $("#results").hidden=true;
+  $("#lotExplorer").innerHTML="";
   $("#panel-extract").innerHTML="";
 }
 function selectPdf(file){
@@ -217,8 +242,9 @@ $("#runBtn").addEventListener("click",async()=>{
       throw new Error("O PDF não contém texto selecionável. Faça OCR antes de enviá-lo.");
     setStatus("Organizando as três partes…",true);
     const extracted=extractWorkbookRows(pdf,STATE.pdfFile.name);
+    STATE.pdf=pdf;
     STATE.extracted=extracted;
-    renderExtracted(extracted);
+    showLotView(null);
     $("#resultMeta").textContent=`${pdf.pages.length} página(s) lida(s) · ${extracted["Parte 2"].length} lote(s) · ${extracted["Parte 3"].length} ensaio(s) de cimento`;
     $("#results").hidden=false;
     $("#exportBtn").disabled=false;
@@ -232,6 +258,14 @@ $("#runBtn").addEventListener("click",async()=>{
     STATE.busy=false;
     $("#runBtn").disabled=false;
   }
+});
+
+$("#lotExplorer").addEventListener("click",event=>{
+  const button=event.target.closest("button[data-lot-index]");
+  if (!button || !STATE.pdf) return;
+  const index=button.dataset.lotIndex==="all" ? null : Number(button.dataset.lotIndex);
+  if (index!==null && (!Number.isInteger(index) || index<0 || index>=STATE.pdf.lots.length)) return;
+  showLotView(index);
 });
 
 $("#resetBtn").addEventListener("click",()=>{

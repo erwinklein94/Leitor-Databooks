@@ -8,8 +8,9 @@ O processamento ocorre no navegador. O PDF não é enviado a um servidor.
 
 1. Selecione ou arraste um Data Book em PDF.
 2. Clique em **Extrair dados**.
-3. Revise os valores mostrados nas três partes.
-4. Clique em **Exportar Excel** e copie as linhas necessárias para a planilha oficial.
+3. Na lista **Lotes encontrados**, escolha **Todos os lotes** para ver um lote por linha ou selecione um lote para consultar separadamente os dados do certificado e as leituras de temperatura.
+4. Revise os valores mostrados nas três partes. As Partes 1 e 3 contêm informações gerais do Data Book; a Parte 2 contém uma linha por lote.
+5. Clique em **Exportar Excel · todos os lotes** e copie as linhas necessárias para a planilha oficial.
 
 O site aceita somente PDF como entrada. A biblioteca XLSX é usada apenas para gerar o arquivo de saída.
 

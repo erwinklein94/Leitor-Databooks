@@ -22,7 +22,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900;950&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="styles.css?v=pdf-only-20261012" />
+<link rel="stylesheet" href="styles.css?v=lot-view-20261012" />
 </head>
 <body>
 <div class="topbar">
@@ -77,14 +77,15 @@
     </div>
     <div class="setup-foot">
       <button class="btn btn-primary" id="runBtn" disabled>Extrair dados →</button>
-      <button class="btn btn-ghost" id="exportBtn" disabled>Exportar Excel</button>
+      <button class="btn btn-ghost" id="exportBtn" disabled>Exportar Excel · todos os lotes</button>
       <button class="btn btn-ghost" id="resetBtn" hidden>Trocar PDF</button>
       <div class="status-line" id="statusLine" role="status" aria-live="polite"><span class="spin"></span><span id="statusTxt">Aguardando um Data Book em PDF.</span></div>
     </div>
   </div>
 
   <section id="results" hidden aria-labelledby="resultsTitle">
-    <div class="results-head"><div><h2 id="resultsTitle">2. Dados extraídos</h2><p id="resultMeta"></p></div><button class="btn btn-primary" type="button" id="exportBtnBottom">Exportar Excel</button></div>
+    <div class="results-head"><div><h2 id="resultsTitle">2. Dados extraídos</h2><p id="resultMeta"></p></div><button class="btn btn-primary" type="button" id="exportBtnBottom">Exportar Excel · todos os lotes</button></div>
+    <div id="lotExplorer"></div>
     <div id="panel-extract"></div>
   </section>
 
@@ -93,9 +94,9 @@
   </div>
 </div>
 
-<script src="export-schema.js?v=pdf-only-20261012"></script>
-<script src="app.js?v=pdf-only-20261012"></script>
-<script src="extraction.js?v=pdf-only-20261012"></script>
+<script src="export-schema.js?v=lot-view-20261012"></script>
+<script src="app.js?v=lot-view-20261012"></script>
+<script src="extraction.js?v=lot-view-20261012"></script>
 <script>
 (function(){
   const btn = document.getElementById("themeToggle");

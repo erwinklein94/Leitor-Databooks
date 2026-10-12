@@ -12,6 +12,15 @@ async function main(){
   const parser=source.slice(0,source.indexOf('/* Interface: somente PDF'));
   const context=vm.createContext({pdfjsLib});
   vm.runInContext(parser,context);
+  const repeated=vm.runInContext(`uniqueLots([
+    {lote:'123',data:'12/10/2026',tipo:null,page:2,comp:{7:[31,32]},trac:{},temp:[]},
+    {lote:'123',data:null,tipo:'Dormente',page:5,comp:{28:[41,42]},trac:{28:[6,7]},temp:[{hhmm:'08:00'}]},
+    {lote:'456',data:null,tipo:null,page:8,comp:{},trac:{},temp:[]}
+  ])`,context);
+  assert.equal(repeated.length,2);
+  assert.equal(repeated[0].page,2);
+  assert.equal(repeated[0].comp[28][0],41);
+  assert.equal(repeated[0].tipo,'Dormente');
   pdfjsLib.GlobalWorkerOptions.workerSrc=pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
   const pdf=await PDFDocument.create();
   const page=pdf.addPage([595,842]);

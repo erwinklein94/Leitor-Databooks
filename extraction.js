@@ -199,7 +199,40 @@ function extractWorkbookRows(pdf,fileName){
 function escapeExtracted(value){
   return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-function renderExtracted(data){
+function lotLabel(lot,index){ return lot.lote ? `Lote ${lot.lote}` : `Lote sem número · página ${lot.page||index+1}`; }
+function showLotView(index){
+  STATE.activeLotIndex=index;
+  const lots=STATE.pdf.lots;
+  const controls=`<div class="lot-controls" role="group" aria-label="Selecionar lote">
+    <button type="button" data-lot-index="all" aria-pressed="${index===null}" class="lot-choice${index===null?" active":""}">Todos os lotes <span>${lots.length}</span></button>
+    ${lots.map((lot,i)=>`<button type="button" data-lot-index="${i}" aria-pressed="${index===i}" class="lot-choice${index===i?" active":""}">${escapeExtracted(lotLabel(lot,i))}</button>`).join("")}</div>`;
+  let content;
+  if (!lots.length){
+    content='<p class="lot-message">Nenhum certificado de qualidade de lote foi identificado. Confira se o PDF contém texto selecionável e os certificados de lote.</p>';
+  }else if (index===null){
+    const columns=["Lote","Produção","Página PDF","Comp. 28 d CP1","Comp. 28 d CP2","Flexão 28 d CP1","Flexão 28 d CP2","Temp. máxima"];
+    const body=STATE.extracted["Parte 2"].map((row,i)=>{
+      const cells=[lotLabel(lots[i],i),row[2],row[3],row[8],row[9],row[12],row[13],row[14]];
+      return `<tr><th scope="row"><button type="button" data-lot-index="${i}" class="lot-row-link">${escapeExtracted(cells[0])}</button></th>${cells.slice(1).map(value=>`<td>${escapeExtracted(value===""?"—":value)}</td>`).join("")}</tr>`;
+    }).join("");
+    content=`<p class="lot-message">Visão geral do Data Book: cada lote ocupa uma linha. Selecione um lote para ver seus dados separadamente.</p>
+      <div class="lot-table-scroll"><table class="lot-table"><thead><tr>${columns.map(label=>`<th scope="col">${label}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }else{
+    const lot=lots[index], row=STATE.extracted["Parte 2"][index];
+    const fields=EXPORT_HEADERS["Parte 2"].map((header,i)=>({header,value:row[i]})).slice(2);
+    const temperature=lot.temp.length?`<div class="lot-table-scroll"><table class="lot-table"><thead><tr><th>Horário</th><th>Início (°C)</th><th>Meio (°C)</th><th>Fim (°C)</th></tr></thead><tbody>${lot.temp.map(reading=>`<tr><th scope="row">${escapeExtracted(reading.hhmm)}</th>${[reading.ini,reading.meio,reading.fim].map(value=>`<td>${escapeExtracted(value??"—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:'<p class="lot-message">Não foram identificadas leituras de temperatura para este lote.</p>';
+    content=`<p class="lot-message"><strong>${escapeExtracted(lotLabel(lot,index))}</strong>${lot.tipo?` · ${escapeExtracted(lot.tipo)}`:""}. Dados do certificado encontrado na página ${escapeExtracted(lot.page)}.</p>
+      <div class="lot-detail-grid">${fields.map(({header,value})=>`<div class="lot-detail"><span>${escapeExtracted(header)}</span><strong>${escapeExtracted(value===""?"—":value)}</strong></div>`).join("")}</div>
+      <h4 class="lot-subtitle">Leituras de temperatura</h4>${temperature}`;
+  }
+  document.getElementById("lotExplorer").innerHTML=`<section class="section lot-explorer" aria-label="Lotes do Data Book"><div class="section-h"><h3>Lotes encontrados</h3><p>${lots.length} lote(s) identificado(s) no PDF</p></div><div class="section-b">${controls}${content}</div></section>`;
+  renderExtracted(STATE.extracted,index);
+}
+function renderExtracted(data,activeLotIndex=null){
+  if (activeLotIndex!==null){
+    document.getElementById("panel-extract").innerHTML='<div class="notice info"><span class="ni">ℹ</span><div>As abas Parte 1 e Parte 3 contêm informações gerais do Data Book. Escolha <b>Todos os lotes</b> para vê-las junto com a tabela completa da Parte 2. O Excel exportado contém todos os lotes, um por linha na Parte 2.</div></div>';
+    return;
+  }
   const sections=Object.entries(EXPORT_HEADERS).map(([name,headers])=>{
     const rows=data[name];
     const filled=rows.reduce((sum,row)=>sum+row.slice(1).filter(value=>value!==""&&value!=null).length,0);
