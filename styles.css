@@ -344,6 +344,30 @@ html[data-theme="light"] .spin{border-color:#cadce8;border-top-color:var(--navy)
 /* ---------- Tabs ---------- */
 .tabs{display:none;margin:28px 0 18px;gap:8px;overflow-x:auto;padding:4px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.08);backdrop-filter:blur(14px)}
 .tabs.show{display:flex}
+[hidden]{display:none!important}
+.tab[hidden]{display:none!important}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.extract-scroll{overflow:auto;max-height:540px}
+.extract-table{border-collapse:separate;border-spacing:0;font-size:12px;min-width:max-content;width:100%}
+.extract-table th,.extract-table td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top;min-width:150px;max-width:310px;white-space:normal;overflow-wrap:anywhere}
+.extract-table th{position:sticky;top:0;z-index:2;background:var(--navy-2);color:#fff;font-weight:800}
+.extract-table td{color:var(--text)}
+.extract-table th:first-child,.extract-table td:first-child{position:sticky;left:0;z-index:1;background:var(--panel-2);min-width:145px}
+.extract-table th:first-child{z-index:3;background:var(--navy-2)}
+.extract-empty{font-style:italic;color:var(--muted)!important}
+.extract-nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.extract-nav a{display:inline-flex;padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--text);font-size:.82rem;font-weight:800;text-decoration:none}
+.extract-nav a:hover{border-color:var(--yellow);color:var(--yellow)}
+.extract-section{scroll-margin-top:24px}
+.results-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:28px 0 16px;color:var(--text)}
+.results-head h2{margin:0 0 4px;font-size:1.1rem}
+.results-head p{margin:0;color:var(--muted);font-size:.86rem}
+#statusLine.error{color:var(--bad)}
+@media(max-width:700px){.results-head{align-items:flex-start;flex-direction:column}}
+.setup .setup-body{grid-template-columns:minmax(0,1fr)}
+.setup .setup-body .drop{min-height:88px}
+.setup .setup-body .field{min-width:0}
+.drop:focus-visible{outline:3px solid var(--yellow);outline-offset:3px}
 .tab{
   position:relative;
   white-space:nowrap;
