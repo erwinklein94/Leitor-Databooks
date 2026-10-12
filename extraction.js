@@ -87,6 +87,47 @@ function firstPageField(pages, aliases, text=false){
   }
   return "";
 }
+function coverProduct(pages){
+  for (const page of pages){
+    const index=page.lines.findIndex(line=>/^\s*PRODUTO\s*:/i.test(line));
+    if (index<0) continue;
+    const inline=textAfterLabel(page.lines[index],"PRODUTO");
+    const detail=inline?[inline]:[];
+    for (const line of page.lines.slice(index+1,index+5)){
+      if (/^(?:MODELO|DATA BOOK|LOTES|QUANTIDADE|CAVAN|UNIDADE INDUSTRIAL|ROD\.|CEP\.|TELEFONE|HTTP)/i.test(line)) break;
+      detail.push(line);
+    }
+    if (detail.length) return safeCell(detail.join(" ")).slice(0,400);
+  }
+  return "";
+}
+function aggregateAnalysis(pages){
+  const records={sand:[],stone:[]};
+  let foundForm=false;
+  for (const page of pages){
+    if (!plain(page.lines.join(' ')).includes('analise de agregados')) continue;
+    foundForm=true;
+    const start=page.lines.findIndex(line=>/^\s*AGREGADO\b/i.test(line));
+    const end=page.lines.findIndex((line,index)=>index>start&&/^\s*LIMITES\b/i.test(line));
+    if (start<0 || end<0) continue;
+    for (const line of page.lines.slice(start+1,end)){
+      const match=line.match(/^\s*(AREIA|BRITA\s+N\s*[°ºo.]?\s*1)\s+(.+)$/i);
+      if (!match) continue;
+      const tokens=(match[2].match(/(?:<\s*)?\d{1,3}(?:[.,]\d{1,3})?|N\s*\/\s*A/gi)||[]).map(value=>value.replace(/\s+/g,''));
+      if (tokens.length<4) continue;
+      const kind=/AREIA/i.test(match[1])?'sand':'stone';
+      const [real,apparent,clay,fines,organic]=tokens.length>=5?tokens:[tokens[0],'',tokens[1],tokens[2],tokens[3]];
+      const record={real,apparent,clay,fines,organic};
+      if (!records[kind].some(other=>Object.keys(record).every(key=>other[key]===record[key]))) records[kind].push(record);
+    }
+  }
+  return foundForm?records:null;
+}
+function aggregateValue(records,key){
+  const values=[...new Set(records.map(record=>record[key]).filter(value=>value&&value.toUpperCase()!=='N/A'))];
+  if (values.length===1 && !values[0].startsWith('<')) return Number(values[0].replace(',','.'));
+  return values.join('; ');
+}
 function averageField(rows,index){
   const values=rows.map(row=>row[index]).filter(value=>Number.isFinite(value));
   return values.length?Math.round(values.reduce((sum,value)=>sum+value,0)/values.length*100)/100:"";
@@ -96,8 +137,8 @@ function extractPart1(pdf, fileName,cementRows){
   const row=Array(headers.length).fill("");
   row[0]=fileName.replace(/\.pdf$/i,"");
   row[1]=firstPageField(pdf.pages.slice(0,2),["Unidade industrial:","Fornecedor:","Unidade:","Fabricante:"],true);
-  row[2]=firstPageField(pdf.pages.slice(0,2),["Período de produção:"],true) || [...new Set(pdf.lots.map(lot=>lot.data).filter(Boolean))].join("; ");
-  row[3]=firstPageField(pdf.pages.slice(0,2),["Produto:"],true) || [...new Set(pdf.lots.map(lot=>lot.tipo).filter(Boolean))].join("; ");
+  row[2]=firstPageField(pdf.pages.slice(0,2),["Período de produção:","Período de fabricação:"],true) || [...new Set(pdf.lots.map(lot=>lot.data).filter(Boolean))].join("; ");
+  row[3]=coverProduct(pdf.pages.slice(0,2)) || [...new Set(pdf.lots.map(lot=>lot.tipo).filter(Boolean))].join("; ");
   row[4]=lotSummary(pdf.lots,lot=>lot.temp.map(reading=>`${reading.hhmm} (${[reading.ini,reading.meio,reading.fim].map(displayNumber).join("/")})`));
   row[5]=firstPageField(pdf.pages,["Temperatura ambiente no início da concretagem","Temperatura ambiente:"],false);
   row[6]=firstPageField(pdf.pages,["Temperatura do concreto no início da concretagem","Temperatura do concreto:"],false);
@@ -113,6 +154,16 @@ function extractPart1(pdf, fileName,cementRows){
     const lines=relevantLines(pdf.pages,category);
     const text=/certificado|quantidades|refugos|compatibilidade|entrega|justificativa|plano de inspeção|água para preparação|propriedades físicas/i.test(label);
     row[index]=fieldValue(lines,[label,label.replace(/\s*\([^)]*\)\s*$/,"")],text);
+  }
+  const aggregates=aggregateAnalysis(pdf.pages);
+  if (aggregates){
+    // A tabela da amostra e a tabela de limites compartilham os mesmos rótulos.
+    // Os valores vêm exclusivamente das linhas AREIA e BRITA da amostra.
+    for (let index=7;index<=41;index++) row[index]="";
+    const mappings={sand:{real:8,apparent:12,clay:20,fines:17,organic:21},
+      stone:{real:23,apparent:27,clay:35,fines:32}};
+    for (const [kind,fields] of Object.entries(mappings))
+      for (const [key,index] of Object.entries(fields)) row[index]=aggregateValue(aggregates[kind],key);
   }
   const summaryFields={
     58:lotSummary(pdf.lots,lot=>lot.comp["7"]||[]),
@@ -208,7 +259,7 @@ function showLotView(index){
     ${lots.map((lot,i)=>`<button type="button" data-lot-index="${i}" aria-pressed="${index===i}" class="lot-choice${index===i?" active":""}">${escapeExtracted(lotLabel(lot,i))}</button>`).join("")}</div>`;
   let content;
   if (!lots.length){
-    content='<p class="lot-message">Nenhum certificado de qualidade de lote foi identificado. Confira se o PDF contém texto selecionável e os certificados de lote.</p>';
+    content='<p class="lot-message">Nenhum lote foi identificado. Confira se o PDF contém texto selecionável e registros de lote.</p>';
   }else if (index===null){
     const columns=["Lote","Produção","Página PDF","Comp. 28 d CP1","Comp. 28 d CP2","Flexão 28 d CP1","Flexão 28 d CP2","Temp. máxima"];
     const body=STATE.extracted["Parte 2"].map((row,i)=>{
@@ -221,7 +272,7 @@ function showLotView(index){
     const lot=lots[index], row=STATE.extracted["Parte 2"][index];
     const fields=EXPORT_HEADERS["Parte 2"].map((header,i)=>({header,value:row[i]})).slice(2);
     const temperature=lot.temp.length?`<div class="lot-table-scroll"><table class="lot-table"><thead><tr><th>Horário</th><th>Início (°C)</th><th>Meio (°C)</th><th>Fim (°C)</th></tr></thead><tbody>${lot.temp.map(reading=>`<tr><th scope="row">${escapeExtracted(reading.hhmm)}</th>${[reading.ini,reading.meio,reading.fim].map(value=>`<td>${escapeExtracted(value??"—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:'<p class="lot-message">Não foram identificadas leituras de temperatura para este lote.</p>';
-    content=`<p class="lot-message"><strong>${escapeExtracted(lotLabel(lot,index))}</strong>${lot.tipo?` · ${escapeExtracted(lot.tipo)}`:""}. Dados do certificado encontrado na página ${escapeExtracted(lot.page)}.</p>
+    content=`<p class="lot-message"><strong>${escapeExtracted(lotLabel(lot,index))}</strong>${lot.tipo?` · ${escapeExtracted(lot.tipo)}`:""}. Dados encontrados na página ${escapeExtracted(lot.page)}.</p>
       <div class="lot-detail-grid">${fields.map(({header,value})=>`<div class="lot-detail"><span>${escapeExtracted(header)}</span><strong>${escapeExtracted(value===""?"—":value)}</strong></div>`).join("")}</div>
       <h4 class="lot-subtitle">Leituras de temperatura</h4>${temperature}`;
   }

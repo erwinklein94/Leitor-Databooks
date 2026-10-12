@@ -68,6 +68,7 @@
 
   <section id="results" hidden aria-labelledby="resultsTitle">
     <div class="results-head"><div><h2 id="resultsTitle">2. Dados extraídos</h2><p id="resultMeta"></p></div><button class="btn btn-primary" type="button" id="exportBtnBottom">Exportar Excel · todos os lotes</button></div>
+    <div id="reviewNotice" class="notice info" hidden></div>
     <div id="lotExplorer"></div>
     <div id="panel-extract"></div>
   </section>
@@ -78,8 +79,9 @@
 </div>
 
 <script src="export-schema.js?v=mono-compact-20261012"></script>
-<script src="app.js?v=mono-compact-20261012"></script>
-<script src="extraction.js?v=mono-compact-20261012"></script>
+<script src="legacy-forms.js?v=forms-20261012"></script>
+<script src="app.js?v=forms-20261012"></script>
+<script src="extraction.js?v=forms-20261012"></script>
 <script>
 (function(){
   const btn = document.getElementById("themeToggle");

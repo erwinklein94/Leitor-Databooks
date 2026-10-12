@@ -11,10 +11,10 @@ const STATE = { pdfFile:null, pdf:null, extracted:null, activeLotIndex:null, bus
    =================================================================== */
 async function parsePDF(file, statusCb){
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-  const lots = [];
+  const pdf = await pdfjsLib.getDocument({data:buf,verbosity:0}).promise;
+  const lotRecords = [];
   const pages = [];
-  for (let p=1; p<=pdf.numPages; p++){
+  try { for (let p=1; p<=pdf.numPages; p++){
     if (p%10===0 && statusCb) statusCb(`Lendo databook… página ${p}/${pdf.numPages}`);
     const page = await pdf.getPage(p);
     const tc = await page.getTextContent();
@@ -24,31 +24,53 @@ async function parsePDF(file, statusCb){
       y: it.transform[5]
     })).filter(it=>it.str.trim()!=="");
     const flat = items.map(i=>i.str).join(" ");
-    pages.push({number:p, lines:pdfPageLines(items)});
-    if (!/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)) continue;
-    lots.push(parseCertPage(items, p));
-  }
-  return {lots:uniqueLots(lots), pages};
+    const lines=pdfPageLines(items);
+    pages.push({number:p, lines});
+    const production=parseProductionForm(lines,p);
+    if (production) lotRecords.push(production);
+    const inspection=parseInspectionForm(lines,p);
+    if (inspection) lotRecords.push(inspection);
+    lotRecords.push(...parseConcreteForm(items,p));
+    if (/CERTIFICADO DE QUALIDADE DO LOTE/i.test(flat)){
+      const certificate=parseCertPage(items,p);
+      certificate.source="certificate";
+      lotRecords.push(certificate);
+    }
+  }} finally { await pdf.destroy(); }
+  return {lots:uniqueLots(lotRecords), pages};
 }
 
 /* Um mesmo certificado pode aparecer mais de uma vez no PDF. Consolida as
    páginas repetidas sem misturar lotes diferentes. */
 function uniqueLots(lots){
-  const byNumber=new Map();
   const unique=[];
+  const identity=lot=>{
+    const match=String(lot.lote||"").match(/^([A-Z]?)(\d{3,6})(?:[/-](\d{2,4}))?$/i);
+    if (!match) return null;
+    const year=match[3] ? match[3].slice(-2) : (String(lot.data||"").match(/\/(\d{2,4})$/)||[])[1]?.slice(-2)||"";
+    return {base:`${match[1].toUpperCase()}${Number(match[2])}`,year};
+  };
   for (const lot of lots){
-    const key=lot.lote ? lot.lote.trim().toUpperCase() : null;
-    if (!key || !byNumber.has(key)){
-      unique.push(lot);
-      if (key) byNumber.set(key,lot);
-      continue;
-    }
-    const original=byNumber.get(key);
+    const key=identity(lot);
+    const original=key&&unique.find(other=>{
+      const current=identity(other);
+      return current&&current.base===key.base&&(!current.year||!key.year||current.year===key.year);
+    });
+    if (!original){unique.push(lot);continue;}
+    if (!/[/-]\d{2,4}$/.test(original.lote||"") && /[/-]\d{2,4}$/.test(lot.lote||"")) original.lote=lot.lote;
     original.data ||= lot.data;
     original.tipo ||= lot.tipo;
-    for (const age of Object.keys(lot.comp)) original.comp[age] ||= lot.comp[age];
-    for (const age of Object.keys(lot.trac)) original.trac[age] ||= lot.trac[age];
+    for (const age of Object.keys(lot.comp))
+      if (!original.comp[age] || original.comp[age].filter(value=>value!=="").length<lot.comp[age].filter(value=>value!=="").length)
+        original.comp[age]=lot.comp[age];
+    for (const age of Object.keys(lot.trac))
+      if (!original.trac[age] || original.trac[age].filter(value=>value!=="").length<lot.trac[age].filter(value=>value!=="").length)
+        original.trac[age]=lot.trac[age];
     if (lot.temp.length>original.temp.length) original.temp=lot.temp;
+    if (["certificate","concrete"].includes(lot.source) && !["certificate","concrete"].includes(original.source)){
+      original.page=lot.page;
+      original.source=lot.source;
+    }
   }
   return unique;
 }
@@ -197,8 +219,21 @@ function clearResults(){
   STATE.activeLotIndex=null;
   $("#exportBtn").disabled=true;
   $("#results").hidden=true;
+  $("#reviewNotice").hidden=true;
+  $("#reviewNotice").textContent="";
   $("#lotExplorer").innerHTML="";
   $("#panel-extract").innerHTML="";
+}
+function reviewMessages(pdf,extracted){
+  const notes=[];
+  const withoutTests=pdf.lots.filter(lot=>!lot.comp["28"]?.length);
+  if (withoutTests.length) notes.push(`${withoutTests.length} lote(s) sem resultado de compressão aos 28 dias no PDF: ${withoutTests.slice(0,8).map(lot=>lot.lote).join(", ")}${withoutTests.length>8?"…":""}.`);
+  const atypical=pdf.lots.filter(lot=>Object.values(lot.comp).flat().some(value=>typeof value==="number"&&(value<15||value>110)));
+  if (atypical.length) notes.push(`Valores de compressão atípicos no texto do PDF; confira os lotes ${atypical.map(lot=>lot.lote).join(", ")} na página indicada.`);
+  const lotYears=new Set(pdf.lots.map(lot=>String(lot.data||"").match(/\/(20\d{2})$/)?.[1]).filter(Boolean));
+  const coverYears=[...String(extracted["Parte 1"][0][2]).matchAll(/20\d{2}/g)].map(match=>match[0]);
+  if (lotYears.size && coverYears.some(year=>!lotYears.has(year))) notes.push("O período impresso na capa contém um ano diferente das datas dos lotes. Confira a capa do PDF.");
+  return notes;
 }
 function selectPdf(file){
   if (STATE.busy || !file) return;
@@ -244,6 +279,9 @@ $("#runBtn").addEventListener("click",async()=>{
     const extracted=extractWorkbookRows(pdf,STATE.pdfFile.name);
     STATE.pdf=pdf;
     STATE.extracted=extracted;
+    const notes=reviewMessages(pdf,extracted);
+    $("#reviewNotice").textContent=notes.join(" ");
+    $("#reviewNotice").hidden=!notes.length;
     showLotView(null);
     $("#resultMeta").textContent=`${pdf.pages.length} página(s) lida(s) · ${extracted["Parte 2"].length} lote(s) · ${extracted["Parte 3"].length} ensaio(s) de cimento`;
     $("#results").hidden=false;

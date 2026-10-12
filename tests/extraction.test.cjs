@@ -46,6 +46,20 @@ assert.equal(extracted['Parte 2'][0][17], 41.3);
 assert.equal(extracted['Parte 3'][0][2], 3.4);
 assert.equal(extracted['Parte 3'][0][3], 2.1);
 assert.equal(extracted['Parte 3'][0][17], 'Dentro do limite');
+context.aggregatesFixture={pages:[{number:1,lines:[
+  'ANÁLISE DE AGREGADOS',
+  'AGREGADO M.E.R M.E.A TORRÕES ARGILA MAT.PULVERULENTO IMP.ORGANICA',
+  'AREIA 2,645 1 0,9 1,35 <300',
+  'BRITA N° 1 2,777 1,527 N/A 0,93 N/A',
+  'LIMITES',
+  'MAT.PULVERULENTO MAX 5.0%'
+]}],lots:[]};
+const aggregateRows=run('extractWorkbookRows(aggregatesFixture,"agregado.pdf")');
+assert.equal(aggregateRows['Parte 1'][0][8],2.645);
+assert.equal(aggregateRows['Parte 1'][0][17],1.35);
+assert.equal(aggregateRows['Parte 1'][0][21],'<300');
+assert.equal(aggregateRows['Parte 1'][0][23],2.777);
+assert.equal(aggregateRows['Parte 1'][0][32],0.93);
 context.STATE={pdf,extracted,activeLotIndex:null};
 run('showLotView(null)');
 assert.match(elements.lotExplorer.innerHTML,/Todos os lotes/);

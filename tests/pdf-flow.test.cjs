@@ -11,6 +11,7 @@ async function main(){
   const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
   const parser=source.slice(0,source.indexOf('/* Interface: somente PDF'));
   const context=vm.createContext({pdfjsLib});
+  vm.runInContext(fs.readFileSync(path.join(root,'legacy-forms.js'),'utf8'),context);
   vm.runInContext(parser,context);
   const repeated=vm.runInContext(`uniqueLots([
     {lote:'123',data:'12/10/2026',tipo:null,page:2,comp:{7:[31,32]},trac:{},temp:[]},
